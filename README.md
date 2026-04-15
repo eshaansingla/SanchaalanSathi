@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="apps/web/public/synapse-logo.png" alt="SynapseAI Logo" width="96" />
+<img src="apps/web/public/logo/logo-full.png" alt="Sanchaalan Saathi Logo" width="96" />
 
-# SynapseAI
+# Sanchaalan Saathi
 
 ### *From Chaos to Clarity to Confirmed Action*
 
