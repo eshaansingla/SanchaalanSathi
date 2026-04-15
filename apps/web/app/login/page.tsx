@@ -19,7 +19,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     try {
       await signInWithGoogle();
-      toast("Welcome to SYNAPSE_FIELD", "success");
+      toast("Welcome to Sanchaalan Saathi", "success");
     } catch (e) {
       toast("Sign-in failed. Try again.", "error");
     }
@@ -27,55 +27,58 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-neon-cyan border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#F5F6F1] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#115E54] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background glows */}
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-neon-cyan/10 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-neon-purple/10 blur-[150px] pointer-events-none" />
+    <div className="min-h-screen bg-[#F5F6F1] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute top-[-20%] right-[-15%] w-[55%] h-[55%] rounded-full bg-[#115E54]/6 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-20%] left-[-15%] w-[55%] h-[55%] rounded-full bg-[#48A15E]/6 blur-3xl pointer-events-none" />
+      <div className="absolute top-[40%] left-[30%] w-[30%] h-[30%] rounded-full bg-[#95C78F]/5 blur-2xl pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-blue-500 font-mono drop-shadow-[0_0_20px_rgba(0,243,255,0.4)]">
-            SYNAPSE
+        {/* Logo + Title */}
+        <div className="text-center mb-8 animate-slide-up">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo/logo-icon.png"
+            alt="Sanchaalan Saathi"
+            className="h-20 w-20 mx-auto mb-5 object-contain animate-float drop-shadow-sm"
+          />
+          <h1 className="text-2xl font-bold text-[#115E54] tracking-tight">
+            Sanchaalan Saathi
           </h1>
-          <p className="text-neon-cyan/60 font-mono text-xs tracking-[0.4em] mt-2 uppercase">Field Volunteer Portal</p>
+          <p className="text-gray-500 text-sm mt-1.5">Field Volunteer Portal</p>
         </div>
 
         {/* Card */}
-        <div className="hud-panel rounded-2xl p-8 flex flex-col gap-6">
-          <div className="text-center">
-            <p className="text-slate-300 text-sm leading-relaxed">
-              Sign in to access your mission feed, claim tasks, and submit verification proofs.
-            </p>
-          </div>
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200 flex flex-col gap-5 animate-slide-up delay-100">
+          <p className="text-gray-600 text-sm leading-relaxed text-center">
+            Sign in to access your mission feed, claim tasks, and submit verification proofs.
+          </p>
 
-          <div className="flex flex-col gap-3 text-xs font-mono text-slate-500">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
-              <span>Claim open field tasks</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
-              <span>Submit photo proof for AI verification</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-neon-purple animate-pulse" />
-              <span>Earn XP and climb the leaderboard</span>
-            </div>
+          <div className="flex flex-col gap-2.5 text-sm text-gray-500">
+            {[
+              { color: "bg-[#48A15E]", text: "Claim open field tasks near you" },
+              { color: "bg-[#2A8256]", text: "Submit photo proof for AI verification" },
+              { color: "bg-[#115E54]", text: "Earn XP and climb the leaderboard" },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
+                <span>{item.text}</span>
+              </div>
+            ))}
           </div>
 
           <button
             onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 px-6 rounded-xl border border-gray-300 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -84,13 +87,13 @@ export default function LoginPage() {
             Continue with Google
           </button>
 
-          <p className="text-center text-[10px] text-slate-600 font-mono">
+          <p className="text-center text-xs text-gray-400">
             Free to join · No wallet required
           </p>
         </div>
 
-        <p className="text-center text-xs text-slate-700 mt-6 font-mono">
-          SYNAPSE AI — Team CrownBreakers
+        <p className="text-center text-xs text-gray-400 mt-5 animate-slide-up delay-200">
+          Sanchaalan Saathi — Team CrownBreakers
         </p>
       </div>
     </div>

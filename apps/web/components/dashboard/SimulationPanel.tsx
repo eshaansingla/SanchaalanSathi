@@ -14,6 +14,7 @@ export default function SimulationPanel() {
   const { toast } = useToast();
 
   const handleSimCompare = async () => {
+    setLoading(true);
     const steps = Math.min(Math.max(simSteps, 10), 500);
     try {
       const result = await runComparisonSim(steps);
@@ -36,7 +37,7 @@ export default function SimulationPanel() {
       setAskResult(result);
       toast("Query executed successfully.", "success");
     } catch (e) {
-      toast("Neural link failed. Try again.", "error");
+      toast("Query failed. Try again.", "error");
       console.error(e);
     } finally {
       setLoading(false);
@@ -44,99 +45,97 @@ export default function SimulationPanel() {
   };
 
   return (
-    <div className="absolute bottom-6 left-6 right-6 hud-panel border border-neon-cyan/20 rounded-2xl p-5 shadow-[0_0_40px_rgba(0,0,0,0.8),inset_0_0_20px_rgba(0,243,255,0.05)] flex gap-8 z-20 group max-h-72">
-      
+    <div className="absolute bottom-6 left-6 right-6 bg-white border border-gray-200 rounded-2xl p-5 shadow-lg flex gap-6 z-20 max-h-72">
+
       {/* NLP Search */}
       <div className="flex-1 flex flex-col">
-         <h3 className="text-neon-cyan font-black mb-3 text-sm uppercase tracking-[0.2em] drop-shadow-[0_0_5px_currentColor] flex items-center gap-2">
-           <span className="w-2 h-2 bg-neon-cyan rounded-full animate-pulse"></span>
-           Graph Intelligence
-         </h3>
-         <div className="flex gap-3">
-            <div className="relative flex-1 group-hover:shadow-[0_0_15px_rgba(0,243,255,0.15)] transition-all rounded-lg">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neon-cyan animate-pulse font-mono">{">"}</div>
-              <input 
-                type="text" 
-                placeholder="Query community intelligence..." 
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-lg py-2 pl-8 pr-12 text-sm text-neon-cyan focus:outline-none focus:border-neon-cyan/50 font-mono placeholder-slate-600 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"
-                value={query}
-                maxLength={200}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAskGraph()}
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono text-slate-700 uppercase">
-                {query.length}/200
-              </div>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 bg-[#115E54] rounded-full" />
+          Graph Intelligence
+        </h3>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Query community intelligence..."
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 pl-3 pr-16 text-sm text-gray-700 focus:outline-none focus:border-[#115E54]/40 placeholder-gray-400"
+              value={query}
+              maxLength={200}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAskGraph()}
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+              {query.length}/200
             </div>
-            <button 
-              onClick={handleAskGraph}
-              disabled={loading}
-              className="bg-neon-cyan/10 hover:bg-neon-cyan/20 border border-neon-cyan/50 text-neon-cyan px-6 rounded-lg text-sm font-bold transition-all shadow-[0_0_10px_rgba(0,243,255,0.1)] hover:shadow-[0_0_15px_rgba(0,243,255,0.3)] tracking-widest uppercase"
-            >
-              Exec
-            </button>
-         </div>
-         <div className="mt-4 flex-1 overflow-y-auto bg-slate-950/80 border border-slate-800 rounded-lg p-3 text-xs font-mono text-neon-green/80 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]">
-            {askResult ? (
-              <pre className="whitespace-pre-wrap">{JSON.stringify(askResult.results, null, 2)}</pre>
-            ) : "NLP-to-Cypher terminal standing by..."}
-         </div>
+          </div>
+          <button
+            onClick={handleAskGraph}
+            disabled={loading}
+            className="bg-[#115E54] hover:bg-[#0d4a42] text-white px-5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+          >
+            Run
+          </button>
+        </div>
+        <div className="mt-3 flex-1 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 font-mono">
+          {askResult ? (
+            <pre className="whitespace-pre-wrap">{JSON.stringify(askResult.results, null, 2)}</pre>
+          ) : (
+            <span className="text-gray-400">NLP-to-Cypher terminal standing by...</span>
+          )}
+        </div>
       </div>
 
-      <div className="w-[1px] bg-gradient-to-b from-transparent via-neon-cyan/30 to-transparent"></div>
+      <div className="w-px bg-gray-100" />
 
-      {/* Simulator - Strategy Comparison */}
-      <div className="w-[400px] flex flex-col min-w-[380px]">
-        <h3 className="text-neon-purple font-black mb-3 text-sm uppercase tracking-[0.2em] drop-shadow-[0_0_5px_currentColor] flex items-center gap-2">
-           <span className="w-2 h-2 bg-neon-purple rounded-full animate-pulse"></span>
-           Strategy Comparison Model
+      {/* Strategy Comparison */}
+      <div className="w-[380px] flex flex-col min-w-[340px]">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 bg-[#2A8256] rounded-full" />
+          Strategy Comparison
         </h3>
-        <div className="flex gap-2 mb-4">
-           <div className="relative flex-1">
-             <input 
-               type="number" 
-               min={10} 
-               max={500} 
-               value={simSteps}
-               onChange={(e) => setSimSteps(parseInt(e.target.value) || 10)}
-               className="w-full bg-black/40 border border-slate-800 rounded-lg px-3 py-2 text-xs text-neon-purple focus:border-neon-purple/50 outline-none font-mono"
-             />
-             <div className="absolute -top-2 left-2 px-1 bg-slate-950 text-[8px] text-slate-500 uppercase tracking-tighter">Horizon</div>
-           </div>
-           <button 
-             onClick={handleSimCompare}
-             disabled={loading}
-             className="flex-[2] bg-neon-purple/10 hover:bg-neon-purple/20 text-neon-purple border border-neon-purple/50 px-4 py-2 rounded-lg text-[10px] font-bold transition-all tracking-widest uppercase hover:shadow-[0_0_15px_rgba(217,0,255,0.2)]"
-           >
-             {loading ? "Simulating..." : "Run Parallel Match"}
-           </button>
+        <div className="flex gap-2 mb-3">
+          <div className="relative flex-1">
+            <input
+              type="number"
+              min={10}
+              max={500}
+              value={simSteps}
+              onChange={(e) => setSimSteps(parseInt(e.target.value) || 10)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:border-[#115E54]/40 outline-none"
+            />
+            <div className="absolute -top-2 left-2.5 px-1 bg-white text-[9px] text-gray-400 uppercase tracking-tight">Steps</div>
+          </div>
+          <button
+            onClick={handleSimCompare}
+            disabled={loading}
+            className="flex-[2] bg-[#2A8256] hover:bg-[#115E54] text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            {loading ? "Simulating..." : "Run Parallel Match"}
+          </button>
         </div>
-        
+
         <div className="flex-1 flex gap-3">
           {comparison ? (
             <>
-              <div className="flex-1 bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col">
-                <span className="text-slate-500 text-[10px] uppercase font-mono mb-2">A: Baseline</span>
-                <div className="text-lg font-black text-white">{comparison.comparison.baseline.completion_rate}%</div>
-                <div className="text-[10px] text-slate-400 mt-auto">{comparison.comparison.baseline.estimated_hours}h estimated</div>
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 flex flex-col">
+                <span className="text-[10px] text-gray-400 uppercase font-medium mb-2">A: Baseline</span>
+                <div className="text-xl font-bold text-gray-800">{comparison.comparison.baseline.completion_rate}%</div>
+                <div className="text-[10px] text-gray-500 mt-auto">{comparison.comparison.baseline.estimated_hours}h est.</div>
               </div>
-              
-              <div className="w-[1px] bg-slate-800"></div>
-              
-              <div className="flex-1 bg-slate-950/80 border border-neon-purple/30 rounded-lg p-3 flex flex-col shadow-[inset_0_0_10px_rgba(217,0,255,0.05)]">
-                <span className="text-neon-purple text-[10px] uppercase font-mono mb-2">B: Optimized</span>
-                <div className="text-lg font-black text-white">{comparison.comparison.optimized.completion_rate}%</div>
-                <div className="text-[10px] text-neon-green mt-auto">+{comparison.comparison.delta_completion_rate}% lift</div>
+              <div className="w-px bg-gray-100" />
+              <div className="flex-1 bg-[#48A15E]/8 border border-[#48A15E]/30 rounded-lg p-3 flex flex-col">
+                <span className="text-[10px] text-[#2A8256] uppercase font-semibold mb-2">B: Optimized</span>
+                <div className="text-xl font-bold text-gray-800">{comparison.comparison.optimized.completion_rate}%</div>
+                <div className="text-[10px] text-[#2A8256] font-semibold mt-auto">+{comparison.comparison.delta_completion_rate}% lift</div>
               </div>
             </>
           ) : (
-            <div className="flex-1 border border-dashed border-slate-800 rounded-lg flex items-center justify-center opacity-30 text-[10px] uppercase tracking-widest text-slate-500">
-               Awaiting Scenario Initiation
+            <div className="flex-1 border border-dashed border-gray-200 rounded-lg flex items-center justify-center">
+              <p className="text-xs text-gray-400">Awaiting scenario initiation</p>
             </div>
           )}
         </div>
       </div>
-      
     </div>
   );
 }

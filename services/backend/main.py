@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
     await neo4j_service.close_driver()
 
 app = FastAPI(
-    title="Synapse AI Backend",
+    title="Sanchaalan Saathi Backend",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "synapse-backend"}
+    return {"status": "ok", "service": "sanchaalan-saathi-backend"}
 
 app.include_router(graph_routes.router, prefix="/api/graph", tags=["Graph"])
 app.include_router(seed_routes.router, prefix="/api/seed", tags=["Seed"])

@@ -16,9 +16,7 @@ export default function CameraCapture({ onCapture }: { onCapture: (file: File) =
   };
 
   const handleConfirm = () => {
-    if (file) {
-      onCapture(file);
-    }
+    if (file) onCapture(file);
   };
 
   const clear = () => {
@@ -28,15 +26,21 @@ export default function CameraCapture({ onCapture }: { onCapture: (file: File) =
 
   if (previewUrl) {
     return (
-      <div className="flex flex-col items-center gap-4 bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl">
-        <div className="relative w-full aspect-[3/4] rounded overflow-hidden">
+      <div className="flex flex-col items-center gap-4 bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
+        <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-gray-200">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt="Captured preview" className="object-cover w-full h-full" />
-          <button onClick={clear} className="absolute top-2 right-2 bg-slate-900/50 p-2 rounded-full text-white backdrop-blur hover:bg-red-500/80 transition-colors">
-            <X size={20} />
+          <button
+            onClick={clear}
+            className="absolute top-2 right-2 bg-white/80 backdrop-blur p-1.5 rounded-full text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors border border-gray-200"
+          >
+            <X size={16} />
           </button>
         </div>
-        <button onClick={handleConfirm} className="w-full bg-cyan-600 hover:bg-cyan-500 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-[0.98]">
+        <button
+          onClick={handleConfirm}
+          className="w-full bg-[#115E54] hover:bg-[#0d4a42] py-3 rounded-xl font-semibold text-white transition-colors active:scale-[0.98]"
+        >
           Confirm Verification Photo
         </button>
       </div>
@@ -45,30 +49,30 @@ export default function CameraCapture({ onCapture }: { onCapture: (file: File) =
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative p-6 border-2 border-dashed border-slate-700 bg-slate-800 rounded-xl hover:border-cyan-500 hover:bg-slate-800/80 transition-all flex flex-col items-center justify-center cursor-pointer min-h-[200px]">
-        <input 
-          type="file" 
-          accept="image/*" 
+      <div className="relative p-6 border-2 border-dashed border-gray-200 bg-white rounded-xl hover:border-[#115E54]/40 hover:bg-[#115E54]/4 transition-all flex flex-col items-center justify-center cursor-pointer min-h-[200px]">
+        <input
+          type="file"
+          accept="image/*"
           capture="environment"
           onChange={handleCapture}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
-        <div className="bg-slate-700 p-4 rounded-full mb-3 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
-          <Camera size={32} className="text-cyan-400" />
+        <div className="bg-[#115E54]/8 p-4 rounded-full mb-3">
+          <Camera size={28} className="text-[#115E54]" />
         </div>
-        <h3 className="font-semibold text-slate-200">Open Camera</h3>
-        <p className="text-xs text-slate-500 mt-1">Take a live photo for verification</p>
+        <h3 className="font-semibold text-gray-800 text-sm">Open Camera</h3>
+        <p className="text-xs text-gray-400 mt-1">Take a live photo for verification</p>
       </div>
-      
-      <div className="relative p-4 border border-slate-700 bg-slate-900 rounded-xl flex items-center justify-center gap-2">
-         <input 
-          type="file" 
-          accept="image/*" 
+
+      <div className="relative p-4 border border-gray-200 bg-white rounded-xl flex items-center justify-center gap-2 hover:border-[#115E54]/30 transition-colors">
+        <input
+          type="file"
+          accept="image/*"
           onChange={handleCapture}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
-         <Upload size={18} className="text-slate-400" />
-         <span className="text-sm font-medium text-slate-300">Upload existing photo</span>
+        <Upload size={16} className="text-gray-400" />
+        <span className="text-sm font-medium text-gray-600">Upload existing photo</span>
       </div>
     </div>
   );

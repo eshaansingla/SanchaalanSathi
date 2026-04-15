@@ -36,12 +36,20 @@ export async function POST(req: Request) {
     const result = await model.generateContent(PROMPT + JSON.stringify(fetchedNeeds));
     const text = result.response.text();
     
-    // Parse JSON
-    let parsedText = text;
+    // Parse JSON — strip markdown fences if present
+    let parsedText = text.trim();
     if (parsedText.includes("```json")) {
-       parsedText = parsedText.split("```json")[1].split("```")[0].trim();
+      parsedText = parsedText.split("```json")[1].split("```")[0].trim();
+    } else if (parsedText.includes("```")) {
+      parsedText = parsedText.split("```")[1].split("```")[0].trim();
     }
-    const tasks = JSON.parse(parsedText);
+    let tasks: any[];
+    try {
+      tasks = JSON.parse(parsedText);
+      if (!Array.isArray(tasks)) throw new Error("Expected array");
+    } catch {
+      return NextResponse.json({ error: "AI returned malformed task list" }, { status: 502 });
+    }
 
     const generatedTasks = [];
 

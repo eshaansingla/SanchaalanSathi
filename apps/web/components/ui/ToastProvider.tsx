@@ -12,10 +12,10 @@ const ICONS: Record<ToastType, React.ReactNode> = {
 };
 
 const STYLES: Record<ToastType, string> = {
-  success: "border-neon-green/40 bg-neon-green/10 text-neon-green",
-  error:   "border-red-500/40   bg-red-500/10   text-red-400",
-  warning: "border-neon-orange/40 bg-neon-orange/10 text-neon-orange",
-  info:    "border-neon-cyan/40  bg-neon-cyan/10  text-neon-cyan",
+  success: "border-[#48A15E]/40 bg-[#48A15E]/10 text-[#2A8256]",
+  error:   "border-red-400/40   bg-red-50       text-red-600",
+  warning: "border-amber-400/40 bg-amber-50     text-amber-700",
+  info:    "border-[#115E54]/30 bg-[#115E54]/8  text-[#115E54]",
 };
 
 function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: (id: string) => void }) {
@@ -26,13 +26,13 @@ function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: (id: string) => void
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-sm shadow-xl text-sm font-medium font-mono animate-[slice-in_0.25s_ease-out] ${STYLES[t.type]}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium bg-white animate-[slice-in_0.25s_ease-out] ${STYLES[t.type]}`}
     >
       {ICONS[t.type]}
       <span className="flex-1">{t.message}</span>
       <button
         onClick={() => onDismiss(t.id)}
-        className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
+        className="ml-2 opacity-50 hover:opacity-100 transition-opacity"
       >
         <X size={14} />
       </button>

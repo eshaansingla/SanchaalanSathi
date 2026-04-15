@@ -55,20 +55,23 @@ from typing import Optional
 class TextIngestReq(BaseModel):
     text: str = Field(..., min_length=10, max_length=2000)
     language: Optional[str] = "en"
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 @router.post("/text")
 async def ingest_text(req: TextIngestReq, background_tasks: BackgroundTasks):
     extraction = await extract_entities(req.text, req.language)
     if not extraction or "error" in extraction and extraction["error"]:
         raise HTTPException(status_code=500, detail=extraction.get("error", "Unknown extraction error"))
-        
-    need_id = await write_extraction_to_graph(extraction)
+
+    override_coords = (req.lat, req.lng) if req.lat is not None and req.lng is not None else None
+    need_id = await write_extraction_to_graph(extraction, override_coords=override_coords)
     if not need_id:
         raise HTTPException(status_code=500, detail="Failed to write graph entities")
-    
-    # Trigger Auto-Assignment 
+
+    # Trigger Auto-Assignment
     background_tasks.add_task(perform_auto_assignment)
-    
+
     return {"success": True, "need_id": need_id, "nodes_created": len(extraction.get("nodes", []))}
 
 @router.post("/document")
@@ -94,7 +97,7 @@ async def ingest_voice(request: Request):
     """
     response = VoiceResponse()
     response.say(
-        "Welcome to SYNAPSE AI Emergency Dispatch. Please state your location, your need, and any required skills clearly after the beep.", 
+        "Welcome to Sanchaalan Saathi Emergency Dispatch. Please state your location, your need, and any required skills clearly after the beep.",
         language="hi-IN", voice="Polly.Aditi"
     )
     # Callback uses the same router but a sub-path for clarity

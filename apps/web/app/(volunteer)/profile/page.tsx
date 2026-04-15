@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
@@ -8,7 +8,7 @@ import { useAuth } from "../../../lib/auth";
 import { useVolunteer } from "../../../hooks/useFirestore";
 import { useToast } from "../../../hooks/useToast";
 import {
-  User, Star, Zap, CheckCircle, Clock, LogOut,
+  User, Star, Zap, CheckCircle, LogOut,
   Plus, X, Shield, Activity, Award
 } from "lucide-react";
 
@@ -38,10 +38,10 @@ function getXPToNext(xp: number) {
 
 function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: React.ReactNode; color: string }) {
   return (
-    <div className="hud-panel rounded-xl p-4 flex flex-col items-center gap-2">
-      <div className={`${color}`}>{icon}</div>
-      <span className={`text-2xl font-black font-mono ${color}`}>{value}</span>
-      <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono text-center">{label}</span>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center gap-1.5 shadow-sm hover:shadow-md transition-all">
+      <div className={color}>{icon}</div>
+      <span className={`text-xl font-bold ${color} tabular-nums`}>{value}</span>
+      <span className="text-[10px] text-gray-400 uppercase tracking-wide text-center">{label}</span>
     </div>
   );
 }
@@ -53,6 +53,13 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [newSkill, setNewSkill] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showBar, setShowBar] = useState(false);
+
+  // Animate XP bar on mount
+  useEffect(() => {
+    const t = setTimeout(() => setShowBar(true), 150);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleAddSkill = async (skill: string) => {
     if (!user || !skill.trim()) return;
@@ -98,31 +105,37 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-24 bg-slate-800/50 rounded-xl animate-pulse" />
+      <div className="p-5 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 bg-white rounded-xl animate-pulse border border-gray-200" />
         ))}
       </div>
     );
   }
 
-  if (!user) {
-    router.replace("/login");
-    return null;
-  }
+  if (!user) { router.replace("/login"); return null; }
 
   const level = volunteer ? getLevel(volunteer.totalXP) : 1;
   const xpProgress = volunteer ? getXPToNext(volunteer.totalXP) : { current: 0, needed: 100, pct: 0 };
   const isActive = volunteer?.availabilityStatus === "ACTIVE";
 
+  const achievements = [
+    { label: "First Mission", icon: "🎯", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 1 },
+    { label: "Veteran",       icon: "⭐", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 10 },
+    { label: "Elite",         icon: "🏅", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 50 },
+    { label: "XP Hunter",     icon: "⚡", unlocked: (volunteer?.totalXP ?? 0) >= 500 },
+    { label: "Top 10",        icon: "🏆", unlocked: false },
+    { label: "Legend",        icon: "👑", unlocked: (volunteer?.totalXP ?? 0) >= 5000 },
+  ];
+
   return (
     <main className="p-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-black text-white tracking-widest font-mono">PROFILE</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-lg font-bold text-gray-900">Profile</h1>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-400 transition-colors font-mono"
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors"
         >
           <LogOut size={14} />
           Sign Out
@@ -130,134 +143,141 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar + Name */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative">
+      <div className="flex items-center gap-4 mb-5">
+        <div className="relative shrink-0">
           {user.photoURL ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.photoURL} alt="avatar" className="w-16 h-16 rounded-full border-2 border-neon-cyan/50 shadow-[0_0_15px_rgba(0,243,255,0.2)]" />
+            <img src={user.photoURL} alt="avatar" className="w-16 h-16 rounded-full border-2 border-[#115E54]/30 shadow-sm" />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-neon-cyan/30 flex items-center justify-center">
-              <User size={28} className="text-slate-500" />
+            <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+              <User size={28} className="text-gray-400" />
             </div>
           )}
-          <div className="absolute -bottom-1 -right-1 bg-slate-900 border border-neon-cyan/50 rounded-full px-1.5 py-0.5 text-[9px] font-black text-neon-cyan font-mono">
-            LV{level}
+          <div className="absolute -bottom-1 -right-1 bg-[#115E54] text-white rounded-full px-1.5 py-0.5 text-[9px] font-bold shadow-sm">
+            Lv{level}
           </div>
         </div>
-        <div className="flex-1">
-          <h2 className="font-bold text-white text-lg">{volunteer?.name || user.displayName || "Volunteer"}</h2>
-          <p className="text-slate-500 text-xs font-mono">{user.email}</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-bold text-gray-900 text-base truncate">{volunteer?.name || user.displayName || "Volunteer"}</h2>
+          <p className="text-gray-400 text-xs truncate">{user.email}</p>
           <button
             onClick={handleToggleStatus}
             disabled={updatingStatus}
-            className={`mt-2 flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border transition-all ${
+            className={`mt-2 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border transition-all active:scale-[0.97] ${
               isActive
-                ? "border-neon-green/50 text-neon-green bg-neon-green/10 hover:bg-neon-green/20"
-                : "border-slate-600 text-slate-500 bg-slate-800 hover:bg-slate-700"
+                ? "border-[#48A15E]/40 text-[#2A8256] bg-[#48A15E]/10 hover:bg-[#48A15E]/20"
+                : "border-gray-300 text-gray-400 bg-gray-100 hover:bg-gray-200"
             }`}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-neon-green animate-pulse" : "bg-slate-600"}`} />
-            {isActive ? "ACTIVE" : "OFFLINE"}
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-[#48A15E] animate-pulse" : "bg-gray-400"}`} />
+            {updatingStatus ? "Updating..." : isActive ? "Active" : "Offline"}
           </button>
         </div>
       </div>
 
       {/* XP Bar */}
-      <div className="hud-panel rounded-xl p-4 mb-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-xs text-slate-400 font-mono uppercase tracking-widest">Level {level} — XP Progress</span>
-          <span className="text-xs text-neon-cyan font-mono">{volunteer?.totalXP ?? 0} XP</span>
+          <span className="text-xs text-gray-500 font-medium">Level {level} Progress</span>
+          <span className="text-xs text-[#115E54] font-bold tabular-nums">{volunteer?.totalXP ?? 0} XP</span>
         </div>
-        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-neon-cyan to-blue-500 rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(0,243,255,0.6)]"
-            style={{ width: `${xpProgress.pct}%` }}
+            className="h-full bg-gradient-to-r from-[#115E54] to-[#48A15E] rounded-full transition-all duration-1000 ease-out"
+            style={{ width: showBar ? `${xpProgress.pct}%` : "0%" }}
           />
         </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-slate-600 font-mono">{xpProgress.current} / {xpProgress.needed}</span>
-          <span className="text-[10px] text-slate-600 font-mono">Next level</span>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[10px] text-gray-400 tabular-nums">{xpProgress.current} / {xpProgress.needed} XP</span>
+          <span className="text-[10px] text-gray-400">→ Level {Math.min(level + 1, LEVEL_THRESHOLDS.length)}</span>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <StatCard label="Tasks Done" value={volunteer?.totalTasksCompleted ?? 0} icon={<CheckCircle size={18} />} color="text-neon-green" />
-        <StatCard label="Reputation" value={volunteer?.reputationScore ?? 100} icon={<Shield size={18} />} color="text-neon-cyan" />
-        <StatCard label="Active Now" value={volunteer?.currentActiveTasks ?? 0} icon={<Activity size={18} />} color="text-neon-orange" />
+        <StatCard label="Tasks Done" value={volunteer?.totalTasksCompleted ?? 0} icon={<CheckCircle size={18} />} color="text-[#2A8256]" />
+        <StatCard label="Reputation" value={volunteer?.reputationScore ?? 100}   icon={<Shield size={18} />}      color="text-[#115E54]" />
+        <StatCard label="Active Now" value={volunteer?.currentActiveTasks ?? 0}  icon={<Activity size={18} />}    color="text-amber-600" />
       </div>
 
       {/* Skills */}
-      <div className="hud-panel rounded-xl p-4 mb-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
-          <Star size={14} className="text-neon-cyan" />
-          <h3 className="text-sm font-bold text-white tracking-widest uppercase font-mono">Skills</h3>
+          <Star size={14} className="text-[#115E54]" />
+          <h3 className="text-sm font-semibold text-gray-900">Skills</h3>
+          {volunteer?.skills?.length ? (
+            <span className="ml-auto text-[10px] bg-[#115E54]/10 text-[#115E54] px-1.5 py-0.5 rounded-full font-semibold">
+              {volunteer.skills.length}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2 mb-3 min-h-[32px]">
           {(volunteer?.skills ?? []).map((skill) => (
-            <span key={skill} className="flex items-center gap-1 bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs px-2 py-1 rounded-full font-mono">
+            <span key={skill} className="flex items-center gap-1 bg-[#115E54]/8 border border-[#115E54]/20 text-[#115E54] text-xs px-2.5 py-1 rounded-full">
               {skill}
-              <button onClick={() => handleRemoveSkill(skill)} className="hover:text-red-400 transition-colors ml-0.5">
+              <button onClick={() => handleRemoveSkill(skill)} className="hover:text-red-500 transition-colors ml-0.5">
                 <X size={10} />
               </button>
             </span>
           ))}
           {(!volunteer?.skills || volunteer.skills.length === 0) && (
-            <span className="text-slate-600 text-xs font-mono">No skills added yet</span>
+            <span className="text-gray-400 text-xs italic">No skills added yet</span>
           )}
         </div>
 
-        {/* Quick-add presets */}
+        {/* Preset chips */}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {SKILL_PRESETS.filter(s => !volunteer?.skills?.includes(s)).slice(0, 6).map(skill => (
+          {SKILL_PRESETS.filter((s) => !volunteer?.skills?.includes(s)).slice(0, 6).map((skill) => (
             <button
               key={skill}
               onClick={() => handleAddSkill(skill)}
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-full transition-colors font-mono flex items-center gap-1"
+              className="text-[10px] bg-gray-100 hover:bg-[#115E54]/10 hover:text-[#115E54] border border-gray-200 hover:border-[#115E54]/20 text-gray-500 px-2 py-1 rounded-full transition-all flex items-center gap-1"
             >
               <Plus size={8} /> {skill}
             </button>
           ))}
         </div>
 
-        {/* Custom skill input */}
         <div className="flex gap-2">
           <input
             type="text"
             placeholder="Add custom skill..."
             value={newSkill}
-            onChange={e => setNewSkill(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleAddSkill(newSkill)}
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 outline-none focus:border-neon-cyan/50 font-mono placeholder-slate-600"
+            onChange={(e) => setNewSkill(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddSkill(newSkill)}
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 outline-none focus:border-[#115E54]/40 placeholder-gray-400"
           />
           <button
             onClick={() => handleAddSkill(newSkill)}
-            className="bg-neon-cyan/10 hover:bg-neon-cyan/20 border border-neon-cyan/30 text-neon-cyan px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            className="bg-[#115E54] hover:bg-[#0d4a42] text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
           >
             Add
           </button>
         </div>
       </div>
 
-      {/* Achievement placeholder */}
-      <div className="hud-panel rounded-xl p-4">
+      {/* Achievements */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
-          <Award size={14} className="text-neon-purple" />
-          <h3 className="text-sm font-bold text-white tracking-widest uppercase font-mono">Achievements</h3>
+          <Award size={14} className="text-[#48A15E]" />
+          <h3 className="text-sm font-semibold text-gray-900">Achievements</h3>
+          <span className="ml-auto text-[10px] text-gray-400">
+            {achievements.filter(a => a.unlocked).length}/{achievements.length} unlocked
+          </span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "First Mission", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 1 },
-            { label: "Veteran", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 10 },
-            { label: "Elite", unlocked: (volunteer?.totalTasksCompleted ?? 0) >= 50 },
-            { label: "XP Hunter", unlocked: (volunteer?.totalXP ?? 0) >= 500 },
-            { label: "Top 10", unlocked: false },
-            { label: "Legend", unlocked: (volunteer?.totalXP ?? 0) >= 5000 },
-          ].map(a => (
-            <div key={a.label} className={`rounded-lg p-2 border text-center transition-all ${a.unlocked ? "border-neon-purple/40 bg-neon-purple/10" : "border-slate-800 bg-slate-900/50 opacity-40"}`}>
-              <div className="text-lg mb-1">{a.unlocked ? "🏆" : "🔒"}</div>
-              <span className="text-[9px] font-mono text-slate-400 uppercase">{a.label}</span>
+          {achievements.map((a) => (
+            <div
+              key={a.label}
+              className={`rounded-xl p-3 border text-center transition-all ${
+                a.unlocked
+                  ? "border-[#48A15E]/30 bg-gradient-to-b from-[#48A15E]/8 to-transparent shadow-sm"
+                  : "border-gray-100 bg-gray-50/60 opacity-40"
+              }`}
+            >
+              <div className="text-xl mb-1">{a.unlocked ? a.icon : "🔒"}</div>
+              <span className="text-[9px] text-gray-600 font-medium uppercase tracking-wide block leading-tight">{a.label}</span>
             </div>
           ))}
         </div>

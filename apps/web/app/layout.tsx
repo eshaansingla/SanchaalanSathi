@@ -7,7 +7,7 @@ import { AuthProvider } from '../lib/auth'
 const font = Outfit({ subsets: ['latin'] })
 
 export const viewport: Viewport = {
-  themeColor: '#020617',
+  themeColor: '#115E54',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -15,8 +15,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'SYNAPSE AI',
-  description: 'Closed-loop NGO volunteer coordination platform',
+  title: 'Sanchaalan Saathi',
+  description: 'Emergency intelligence and volunteer coordination platform',
   manifest: '/manifest.json',
 }
 
@@ -27,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${font.className} bg-slate-950 text-slate-50 scanline`}>
+      <body className={`${font.className} bg-[#F5F6F1] text-gray-900`}>
         <AuthProvider>
           <ToastProvider>
             {children}

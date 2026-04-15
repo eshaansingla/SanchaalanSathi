@@ -9,6 +9,7 @@ import { useToast } from "../../../../hooks/useToast";
 import CameraCapture from "../../../../components/volunteer/CameraCapture";
 import { VoiceBriefing } from "../../../../components/volunteer/VoiceBriefing";
 import { FirestoreTask } from "../../../../lib/types";
+import { ArrowLeft, Zap } from "lucide-react";
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -33,17 +34,11 @@ export default function TaskDetail() {
   const handleCapture = async (file: File) => {
     if (!user) return;
     setSubmitting(true);
-    
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("volunteerId", user.uid);
-      
-      const res = await fetch(`/api/tasks/${id}/submit`, {
-        method: "POST",
-        body: formData,
-      });
-      
+      const res = await fetch(`/api/tasks/${id}/submit`, { method: "POST", body: formData });
       if (res.ok) {
         toast("Submitted for AI verification! XP incoming.", "success");
         router.push("/feed");
@@ -57,27 +52,40 @@ export default function TaskDetail() {
     }
   };
 
-  if (loading) return <div className="p-6 text-slate-400 font-mono animate-pulse">LOADING_TASK_DATA...</div>;
-  if (!task) return <div className="p-6 text-red-400 font-mono">ERROR: TASK_NOT_FOUND</div>;
+  if (loading) {
+    return (
+      <div className="p-6 space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-28 bg-white rounded-xl animate-pulse border border-gray-200" />
+        ))}
+      </div>
+    );
+  }
+  if (!task) return <div className="p-6 text-red-500 text-sm">Task not found.</div>;
 
   return (
-    <main className="p-6">
-      <button onClick={() => router.back()} className="text-cyan-400 text-sm mb-6 flex items-center font-bold">
-        ← BACK TO FEED
+    <main className="p-5 pb-8">
+      <button
+        onClick={() => router.back()}
+        className="flex items-center gap-1.5 text-[#115E54] text-sm font-medium mb-5"
+      >
+        <ArrowLeft size={15} />
+        Back to Feed
       </button>
 
-      <div className="bg-slate-900 border border-slate-700 p-5 rounded-2xl shadow-xl mb-6">
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mb-4">
         <div className="flex justify-between items-start mb-3">
-          <h1 className="text-xl font-bold text-white">{task.title}</h1>
-          <span className="bg-cyan-900/50 text-cyan-400 text-xs font-bold px-2 py-1 rounded-full border border-cyan-800">
+          <h1 className="text-base font-bold text-gray-900 leading-snug pr-3">{task.title}</h1>
+          <span className="flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 text-xs font-semibold px-2 py-1 rounded-full shrink-0">
+            <Zap size={11} />
             +{task.xpReward} XP
           </span>
         </div>
-        <p className="text-sm text-slate-400 mb-4">{task.description}</p>
-        
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-          <h3 className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Required Evidence</h3>
-          <p className="text-sm text-slate-300 font-medium">{task.expectedEvidence}</p>
+        <p className="text-sm text-gray-500 mb-4 leading-relaxed">{task.description}</p>
+
+        <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Required Evidence</h3>
+          <p className="text-sm text-gray-700 font-medium">{task.expectedEvidence}</p>
         </div>
 
         <div className="mt-4">
@@ -89,17 +97,15 @@ export default function TaskDetail() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <h2 className="text-sm text-slate-400 uppercase tracking-widest font-semibold mb-3 ml-1">Submit Proof</h2>
-        {submitting ? (
-           <div className="bg-slate-800 p-8 rounded-xl text-center border border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-             <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-             <p className="font-bold text-cyan-400 animate-pulse">Transmitting to Command...</p>
-           </div>
-        ) : (
-           <CameraCapture onCapture={handleCapture} />
-        )}
-      </div>
+      <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Submit Proof</h2>
+      {submitting ? (
+        <div className="bg-white border border-[#115E54]/30 p-8 rounded-xl text-center shadow-sm">
+          <div className="w-8 h-8 border-4 border-[#115E54]/20 border-t-[#115E54] rounded-full animate-spin mx-auto mb-3" />
+          <p className="font-semibold text-[#115E54] text-sm">Submitting for verification...</p>
+        </div>
+      ) : (
+        <CameraCapture onCapture={handleCapture} />
+      )}
     </main>
   );
 }

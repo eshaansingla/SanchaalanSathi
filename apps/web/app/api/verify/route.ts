@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
         responseText = responseText.split("```")[1].split("```")[0].trim();
     }
     
-    const verification = JSON.parse(responseText.trim());
+    let verification: any;
+    try {
+      verification = JSON.parse(responseText.trim());
+    } catch {
+      throw new Error("Failed to parse AI verification response as JSON");
+    }
 
     // 4. Three-tier decision
     let newStatus: string;

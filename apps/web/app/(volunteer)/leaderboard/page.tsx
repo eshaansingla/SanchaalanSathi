@@ -3,23 +3,24 @@
 import React, { useState } from "react";
 import { useLeaderboard } from "../../../hooks/useLeaderboard";
 import { useAuth } from "../../../lib/auth";
-import { Trophy, Zap, CheckCircle, Search, Shield } from "lucide-react";
+import { Trophy, Zap, CheckCircle, Search, Medal } from "lucide-react";
 
-const MEDAL: Record<number, string> = { 0: "🥇", 1: "🥈", 2: "🥉" };
+const MEDAL_ICON = ["🥇", "🥈", "🥉"];
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE:  "bg-neon-green text-neon-green",
-  BUSY:    "bg-neon-orange text-neon-orange",
-  OFFLINE: "bg-slate-600 text-slate-600",
+const STATUS_DOT: Record<string, string> = {
+  ACTIVE:  "bg-[#48A15E]",
+  BUSY:    "bg-amber-500",
+  OFFLINE: "bg-gray-300",
 };
 
+const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5000];
+
 function getLevel(xp: number) {
-  const thresholds = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5000];
   let level = 1;
-  for (let i = 0; i < thresholds.length; i++) {
-    if (xp >= thresholds[i]) level = i + 1;
+  for (let i = 0; i < LEVEL_THRESHOLDS.length; i++) {
+    if (xp >= LEVEL_THRESHOLDS[i]) level = i + 1;
   }
-  return Math.min(level, thresholds.length);
+  return Math.min(level, LEVEL_THRESHOLDS.length);
 }
 
 export default function LeaderboardPage() {
@@ -27,49 +28,94 @@ export default function LeaderboardPage() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
 
-  const filtered = leaders.filter(v =>
+  const filtered = leaders.filter((v) =>
     v.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const myRank = leaders.findIndex(v => v.uid === user?.uid) + 1;
+  const myRank = leaders.findIndex((v) => v.uid === user?.uid) + 1;
 
   return (
     <main className="p-5 pb-8">
-      <div className="flex items-center gap-3 mb-5">
-        <Trophy size={20} className="text-neon-orange" />
-        <h1 className="text-lg font-black text-white tracking-widest font-mono">LEADERBOARD</h1>
+      {/* Header */}
+      <div className="flex items-center gap-2.5 mb-5">
+        <div className="bg-[#115E54]/10 p-2 rounded-xl">
+          <Trophy size={16} className="text-[#115E54]" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 leading-tight">Leaderboard</h1>
+          <p className="text-[10px] text-gray-400">Top volunteers by XP earned</p>
+        </div>
       </div>
 
       {/* My rank banner */}
       {user && myRank > 0 && (
-        <div className="hud-panel rounded-xl p-3 mb-4 flex items-center justify-between border border-neon-cyan/30">
-          <span className="text-xs text-slate-400 font-mono">Your rank</span>
-          <span className="text-neon-cyan font-black font-mono text-lg">#{myRank}</span>
+        <div className="bg-gradient-to-r from-[#115E54]/8 to-[#48A15E]/5 border border-[#115E54]/20 rounded-xl p-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Medal size={14} className="text-[#115E54]" />
+            <span className="text-xs text-gray-600 font-medium">Your ranking</span>
+          </div>
+          <span className="text-[#115E54] font-bold text-lg tabular-nums">#{myRank}</span>
         </div>
       )}
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           placeholder="Search volunteers..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-300 outline-none focus:border-neon-cyan/50 font-mono placeholder-slate-600"
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-gray-700 outline-none focus:border-[#115E54]/40 placeholder-gray-400 shadow-sm transition-colors"
         />
       </div>
 
-      {/* List */}
+      {/* Podium — top 3 only when not searching */}
+      {!search && !loading && filtered.length >= 3 && (
+        <div className="flex items-end justify-center gap-2 mb-5 px-4">
+          {/* 2nd */}
+          <div className="flex-1 flex flex-col items-center">
+            <div className="text-2xl mb-1">🥈</div>
+            <div className="w-full bg-gray-100 border border-gray-200 rounded-t-xl pt-3 pb-2 text-center">
+              <p className="text-xs font-semibold text-gray-700 truncate px-1">{filtered[1]?.name.split(" ")[0]}</p>
+              <p className="text-[10px] text-amber-600 font-bold flex items-center justify-center gap-0.5 mt-0.5">
+                <Zap size={9} />{filtered[1]?.totalXP}
+              </p>
+            </div>
+          </div>
+          {/* 1st */}
+          <div className="flex-1 flex flex-col items-center">
+            <div className="text-3xl mb-1">🥇</div>
+            <div className="w-full bg-gradient-to-b from-[#115E54]/10 to-[#115E54]/5 border border-[#115E54]/25 rounded-t-xl pt-4 pb-2 text-center">
+              <p className="text-xs font-bold text-[#115E54] truncate px-1">{filtered[0]?.name.split(" ")[0]}</p>
+              <p className="text-[10px] text-amber-600 font-bold flex items-center justify-center gap-0.5 mt-0.5">
+                <Zap size={9} />{filtered[0]?.totalXP}
+              </p>
+            </div>
+          </div>
+          {/* 3rd */}
+          <div className="flex-1 flex flex-col items-center">
+            <div className="text-2xl mb-1">🥉</div>
+            <div className="w-full bg-gray-100 border border-gray-200 rounded-t-xl pt-2 pb-2 text-center">
+              <p className="text-xs font-semibold text-gray-700 truncate px-1">{filtered[2]?.name.split(" ")[0]}</p>
+              <p className="text-[10px] text-amber-600 font-bold flex items-center justify-center gap-0.5 mt-0.5">
+                <Zap size={9} />{filtered[2]?.totalXP}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full list */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="h-20 bg-slate-800/50 rounded-xl animate-pulse" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-16 bg-white rounded-xl animate-pulse border border-gray-200" />
           ))}
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((v, i) => {
+          {filtered.map((v) => {
             const rank = leaders.indexOf(v);
             const isMe = v.uid === user?.uid;
             const level = getLevel(v.totalXP);
@@ -79,55 +125,60 @@ export default function LeaderboardPage() {
                 key={v.uid}
                 className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                   isMe
-                    ? "border-neon-cyan/50 bg-neon-cyan/5 shadow-[0_0_15px_rgba(0,243,255,0.1)]"
-                    : "border-slate-800 bg-slate-900/50"
+                    ? "border-[#115E54]/30 bg-gradient-to-r from-[#115E54]/5 to-transparent"
+                    : "border-gray-200 bg-white hover:border-gray-300"
                 }`}
               >
                 {/* Rank */}
                 <div className="w-8 text-center shrink-0">
                   {rank < 3 ? (
-                    <span className="text-xl">{MEDAL[rank]}</span>
+                    <span className="text-xl">{MEDAL_ICON[rank]}</span>
                   ) : (
-                    <span className="text-slate-500 font-mono font-bold text-sm">#{rank + 1}</span>
+                    <span className="text-gray-400 font-semibold text-sm tabular-nums">#{rank + 1}</span>
                   )}
                 </div>
 
-                {/* Name + level */}
+                {/* Name + level + skills */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`font-bold text-sm truncate ${isMe ? "text-neon-cyan" : "text-white"}`}>
+                    <span className={`font-semibold text-sm truncate ${isMe ? "text-[#115E54]" : "text-gray-900"}`}>
                       {v.name}
                     </span>
-                    <span className="text-[9px] bg-slate-800 border border-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-mono shrink-0">
-                      LV{level}
+                    <span className="text-[9px] bg-[#115E54]/8 border border-[#115E54]/20 text-[#115E54] px-1.5 py-0.5 rounded-full font-semibold shrink-0">
+                      Lv{level}
                     </span>
+                    {isMe && (
+                      <span className="text-[9px] bg-[#48A15E]/10 text-[#2A8256] px-1.5 py-0.5 rounded-full font-semibold shrink-0">You</span>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {(v.skills ?? []).slice(0, 3).map(s => (
-                      <span key={s} className="text-[9px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded font-mono">{s}</span>
+                    {(v.skills ?? []).slice(0, 3).map((s) => (
+                      <span key={s} className="text-[9px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {s}
+                      </span>
                     ))}
                   </div>
                 </div>
 
                 {/* Stats */}
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <div className="flex items-center gap-1 text-neon-orange">
+                  <div className="flex items-center gap-1 text-amber-600">
                     <Zap size={11} />
-                    <span className="text-xs font-black font-mono">{v.totalXP}</span>
+                    <span className="text-xs font-bold tabular-nums">{v.totalXP}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-neon-green">
+                  <div className="flex items-center gap-1 text-[#2A8256]">
                     <CheckCircle size={11} />
-                    <span className="text-[10px] font-mono">{v.totalTasksCompleted}</span>
+                    <span className="text-[10px] tabular-nums">{v.totalTasksCompleted}</span>
                   </div>
-                  <div className={`w-1.5 h-1.5 rounded-full ${STATUS_COLOR[v.availabilityStatus]?.split(" ")[0] ?? "bg-slate-600"}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[v.availabilityStatus] ?? "bg-gray-300"}`} />
                 </div>
               </div>
             );
           })}
 
           {filtered.length === 0 && !loading && (
-            <div className="text-center py-12 text-slate-600 font-mono text-sm">
-              No volunteers found.
+            <div className="text-center py-12 text-gray-400 text-sm">
+              No volunteers found matching &ldquo;{search}&rdquo;
             </div>
           )}
         </div>

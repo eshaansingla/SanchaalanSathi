@@ -66,7 +66,7 @@ async def get_volunteers():
 # Field whitelisting to prevent Mass Assignment / IDOR
 ALLOWED_MODELS = {
     "Need": ["status", "urgency_score"],
-    "Volunteer": ["availabilityStatus", "reputation_score"],
+    "Volunteer": ["availabilityStatus", "reputationScore"],  # camelCase matches Neo4j node props
     "Task": ["status"]
 }
 

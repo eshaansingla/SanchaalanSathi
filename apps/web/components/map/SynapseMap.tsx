@@ -6,7 +6,7 @@ import { NeedNode, HotspotResult } from "../../lib/types";
 
 declare const google: any;
 
-interface SynapseMapProps {
+interface SaathiMapProps {
   needs: NeedNode[];
   volunteers: any[];
   hotspots: HotspotResult[];
@@ -14,7 +14,7 @@ interface SynapseMapProps {
   onMarkerClick?: (need: NeedNode) => void;
 }
 
-export default function SynapseMap({ needs, volunteers, hotspots, showVolunteers, onMarkerClick }: SynapseMapProps) {
+export default function SynapseMap({ needs, volunteers, hotspots, showVolunteers, onMarkerClick }: SaathiMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -33,12 +33,13 @@ export default function SynapseMap({ needs, volunteers, hotspots, showVolunteers
         const newMap = new Map(mapRef.current, {
           center: { lat: 28.6139, lng: 77.2090 }, // Delhi
           zoom: 12,
-          mapId: "SYNAPSE_DARK_MAP",
+          mapId: "SAATHI_MAP",
           styles: [
-            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+            { elementType: "geometry", stylers: [{ color: "#f5f6f1" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#c8dff0" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#e5e7eb" }] },
           ],
         });
         setMap(newMap);
@@ -108,9 +109,11 @@ export default function SynapseMap({ needs, volunteers, hotspots, showVolunteers
     if (showVolunteers) {
       volunteers.forEach(v => {
         if (!v.location || typeof v.location.lat !== 'number' || typeof v.location.lng !== 'number') return;
-        
-        const isBusy = v.availability_status === 'BUSY';
-        const color = isBusy ? "#a855f7" : "#06b6d4"; // Purple = Busy, Cyan = Active
+
+        // fetchVolunteers normalises both camelCase (Firestore) and snake_case (legacy) fields
+        const status = v.availabilityStatus ?? v.availability_status ?? "OFFLINE";
+        const isBusy = status === 'BUSY';
+        const color = isBusy ? "#d97706" : "#115E54"; // Amber = Busy, Teal = Active
         
         const iconUrl = `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${encodeURIComponent(color)}"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E`;
 
@@ -129,5 +132,5 @@ export default function SynapseMap({ needs, volunteers, hotspots, showVolunteers
     }
   }, [map, needs, volunteers, hotspots, showVolunteers, onMarkerClick]);
 
-  return <div ref={mapRef} className="w-full h-full rounded-xl overflow-hidden shadow-2xl border border-slate-800" />;
+  return <div ref={mapRef} className="w-full h-full rounded-xl overflow-hidden shadow-sm border border-gray-200" />;
 }

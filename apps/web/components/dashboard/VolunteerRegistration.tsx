@@ -3,138 +3,188 @@
 import React, { useState } from "react";
 import { createVolunteer } from "../../lib/api";
 import { useToast } from "../../hooks/useToast";
-import { UserPlus, Shield, MapPin, Zap } from "lucide-react";
+import { useGeolocation } from "../../hooks/useGeolocation";
+import { UserPlus, MapPin } from "lucide-react";
 
 export default function VolunteerRegistration({ onSuccess }: { onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
+  const [showManualCoords, setShowManualCoords] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     skills: "",
     location_name: "Operations Center",
-    lat: 12.9716, // Default to Bangalore center for demo
-    lng: 77.5946
+    lat: 12.9716,
+    lng: 77.5946,
   });
   const { toast } = useToast();
+  const { requestLocation } = useGeolocation();
+
+  const handleOpen = async () => {
+    setIsOpen(true);
+    const coords = await requestLocation();
+    if (coords) {
+      setFormData((prev) => ({ ...prev, lat: coords.lat, lng: coords.lng }));
+      setShowManualCoords(false);
+      setLocationNote(null);
+    } else {
+      setLocationNote("Location not detected — using default coordinates");
+      setShowManualCoords(true);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || formData.name.length < 2) {
-      toast("Operative name too short.", "error");
+      toast("Name too short.", "error");
       return;
     }
     if (!formData.skills.trim()) {
-      toast("Specializations required for deployment.", "error");
+      toast("Skills are required.", "error");
       return;
     }
 
     setLoading(true);
     try {
-      const skillsArray = formData.skills.split(",").map(s => s.trim()).filter(s => s !== "");
-      await createVolunteer({
-        ...formData,
-        skills: skillsArray
-      });
-      toast("Operative registered in Neural Grid.", "success");
+      const skillsArray = formData.skills.split(",").map((s) => s.trim()).filter((s) => s !== "");
+      await createVolunteer({ ...formData, skills: skillsArray });
+      toast("Volunteer registered successfully.", "success");
       setIsOpen(false);
+      setLocationNote(null);
+      setShowManualCoords(false);
       setFormData({
         name: "",
         phone: "",
         skills: "",
         location_name: "Operations Center",
         lat: 12.9716,
-        lng: 77.5946
+        lng: 77.5946,
       });
       if (onSuccess) onSuccess();
     } catch (err) {
-      toast("Registration failed. Data sync error.", "error");
+      toast("Registration failed. Please try again.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mt-4">
+    <div className="mt-3">
       {!isOpen ? (
-        <button 
-          onClick={() => setIsOpen(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:border-neon-cyan/50 hover:bg-neon-cyan/5 transition-all group shadow-lg underline-offset-4"
+        <button
+          onClick={handleOpen}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-[#115E54] hover:border-[#115E54]/40 hover:bg-[#115E54]/4 transition-all text-sm font-medium shadow-sm"
         >
-          <UserPlus size={16} className="group-hover:text-neon-cyan" />
-          <span className="text-[10px] font-bold tracking-[0.2em] uppercase">Deploy New Operative</span>
+          <UserPlus size={15} />
+          Register Volunteer
         </button>
       ) : (
-        <div className="hud-panel p-5 rounded-xl border border-neon-cyan/30 animate-[slice-in_0.3s_each-out]">
-          <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-neon-cyan flex items-center gap-2">
-              <Shield size={14} />
-              Operative Enrollment
-            </h3>
-            <button onClick={() => setIsOpen(false)} className="text-[10px] text-slate-500 hover:text-white uppercase font-mono tracking-tighter">Abort [ESC]</button>
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-800">Register Volunteer</h3>
+            <button
+              onClick={() => { setIsOpen(false); setLocationNote(null); setShowManualCoords(false); }}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-[8px] uppercase font-mono text-slate-500 tracking-widest text-[7px]">Full Name</label>
-                <span className={`text-[7px] font-mono ${formData.name.length > 50 ? 'text-neon-red' : 'text-slate-600'}`}>{formData.name.length}/50</span>
+          {locationNote && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200/60 rounded-lg px-3 py-2 mb-4">
+              {locationNote}
+            </p>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-gray-600">Full Name</label>
+                <span className={`text-[10px] ${formData.name.length > 50 ? "text-red-500" : "text-gray-400"}`}>
+                  {formData.name.length}/50
+                </span>
               </div>
-              <input 
-                type="text" 
-                placeholder="Operative ID/Name"
+              <input
+                type="text"
+                placeholder="Volunteer name"
                 maxLength={50}
-                className={`w-full bg-black/40 border rounded-lg px-3 py-2 text-xs text-white focus:border-neon-cyan/50 outline-none font-mono tracking-tight ${formData.name.length > 50 ? 'border-neon-red' : 'border-slate-800'}`}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:border-[#115E54]/40 outline-none placeholder-gray-400"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-[8px] uppercase font-mono text-slate-500 tracking-widest text-[7px]">Specializations (Comma Separated)</label>
-                <span className={`text-[7px] font-mono ${formData.skills.length > 100 ? 'text-neon-red' : 'text-slate-600'}`}>{formData.skills.length}/100</span>
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-gray-600">Skills (comma separated)</label>
+                <span className={`text-[10px] ${formData.skills.length > 100 ? "text-red-500" : "text-gray-400"}`}>
+                  {formData.skills.length}/100
+                </span>
               </div>
-              <input 
-                type="text" 
-                placeholder="e.g. MEDICAL, DRIVER, RESCUE"
+              <input
+                type="text"
+                placeholder="e.g. First Aid, Driving, Rescue"
                 maxLength={100}
-                className={`w-full bg-black/40 border rounded-lg px-3 py-2 text-xs text-white focus:border-neon-cyan/50 outline-none font-mono tracking-tight uppercase ${formData.skills.length > 100 ? 'border-neon-red' : 'border-slate-800'}`}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:border-[#115E54]/40 outline-none placeholder-gray-400"
                 value={formData.skills}
-                onChange={(e) => setFormData({...formData, skills: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-               <div className="space-y-1">
-                 <label className="text-[8px] uppercase font-mono text-slate-500 tracking-widest pl-1">Assigned Quadrant</label>
-                 <div className="relative">
-                   <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neon-cyan/50" size={12} />
-                   <input 
-                     type="text" 
-                     className="w-full bg-black/40 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-[10px] text-white focus:border-neon-cyan/50 outline-none font-mono"
-                     value={formData.location_name}
-                     onChange={(e) => setFormData({...formData, location_name: e.target.value})}
-                   />
-                 </div>
-               </div>
-               <div className="space-y-1">
-                 <label className="text-[8px] uppercase font-mono text-slate-500 tracking-widest pl-1">Sync Priority</label>
-                 <div className="relative">
-                   <Zap className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neon-orange/50" size={12} />
-                   <div className="w-full bg-black/40 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-[10px] text-slate-400 font-mono italic">
-                     ALPHA-7
-                   </div>
-                 </div>
-               </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Location Name</label>
+                <div className="relative">
+                  <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#115E54]/50" size={12} />
+                  <input
+                    type="text"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs text-gray-800 focus:border-[#115E54]/40 outline-none"
+                    value={formData.location_name}
+                    onChange={(e) => setFormData({ ...formData, location_name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Priority</label>
+                <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-400 italic">
+                  ALPHA-7
+                </div>
+              </div>
             </div>
 
-            <button 
-              type="submit" 
+            {showManualCoords && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-800 focus:border-[#115E54]/40 outline-none"
+                    value={formData.lat}
+                    onChange={(e) => setFormData({ ...formData, lat: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-800 focus:border-[#115E54]/40 outline-none"
+                    value={formData.lng}
+                    onChange={(e) => setFormData({ ...formData, lng: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-neon-cyan/10 hover:bg-neon-cyan/20 border border-neon-cyan/50 text-neon-cyan py-3 rounded-lg text-[10px] font-black tracking-[0.3em] uppercase transition-all shadow-[0_0_15px_rgba(0,243,255,0.1)] active:scale-[0.98] disabled:opacity-50"
+              className="w-full bg-[#115E54] hover:bg-[#0d4a42] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 mt-1"
             >
-              {loading ? "Syncing Biometrics..." : "Confirm Deployment"}
+              {loading ? "Registering..." : "Register Volunteer"}
             </button>
           </form>
         </div>

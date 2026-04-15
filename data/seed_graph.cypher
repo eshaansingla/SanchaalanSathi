@@ -1,4 +1,4 @@
-// SYNAPSE AI - Demo Seed Graph for "Urban Flood Response"
+// SANCHAALAN SAATHI - Demo Seed Graph for "Urban Flood Response"
 
 // 1. Locations (Delhi Wards)
 CREATE (l1:Location {id: 'l_ward7', name: 'Ward 7, East Delhi', ward: 'Ward 7', lat: 28.6219, lng: 77.2913, point: point({latitude: 28.6219, longitude: 77.2913})})

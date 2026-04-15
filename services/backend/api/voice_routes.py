@@ -51,7 +51,7 @@ async def process_voice_recording(recording_url: str):
 async def twilio_webhook(request: Request):
     """Endpoint for Twilio Phone Number Webhook."""
     response = VoiceResponse()
-    response.say("Welcome to SYNAPSE AI Emergency Dispatch. Please state your location, your need, and any required skills clearly after the beep. Press any key when finished.", language="hi-IN", voice="Polly.Aditi")
+    response.say("Welcome to Sanchaalan Saathi Emergency Dispatch. Please state your location, your need, and any required skills clearly after the beep. Press any key when finished.", language="hi-IN", voice="Polly.Aditi")
     
     response.record(max_length=60, action="/api/voice/recording", play_beep=True)
     
@@ -70,6 +70,6 @@ async def twilio_recording_callback(request: Request, background_tasks: Backgrou
          background_tasks.add_task(process_voice_recording, recording_url + ".wav")
          
     response = VoiceResponse()
-    response.say("Your report has been received and logged into the SYNAPSE system. Help will be coordinated shortly. Goodbye.", language="hi-IN", voice="Polly.Aditi")
+    response.say("Your report has been received and logged into the Sanchaalan Saathi system. Help will be coordinated shortly. Goodbye.", language="hi-IN", voice="Polly.Aditi")
     
     return Response(content=str(response), media_type="application/xml")

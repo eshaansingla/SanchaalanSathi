@@ -1,11 +1,15 @@
 from services.neo4j_service import neo4j_service
 from services.firebase_service import firebase_service
+from typing import Optional, Tuple
 import uuid
 import logging
 
 logger = logging.getLogger(__name__)
 
-async def write_extraction_to_graph(extraction: dict) -> str:
+async def write_extraction_to_graph(
+    extraction: dict,
+    override_coords: Optional[Tuple[float, float]] = None
+) -> str:
     """Takes Gemini output, creates all nodes and edges in Neo4j, returns the generated need_id."""
     if "error" in extraction and extraction["error"]:
         logger.error(f"Extraction error: {extraction['error']}")
@@ -43,6 +47,8 @@ async def write_extraction_to_graph(extraction: dict) -> str:
             )
 
             # Node indices map
+            resolved_lat = 0.0
+            resolved_lng = 0.0
             idx_map = {}
             for i, node in enumerate(nodes):
                 if node["label"] == "Need":
@@ -50,8 +56,15 @@ async def write_extraction_to_graph(extraction: dict) -> str:
                 elif node["label"] == "Location":
                     l_id = f"l_{uuid.uuid4().hex[:12]}"
                     lp = node.get("properties", {})
-                    lat = lp.get("lat") or 0.0
-                    lng = lp.get("lng") or 0.0
+                    gemini_lat = lp.get("lat") or 0.0
+                    gemini_lng = lp.get("lng") or 0.0
+                    if override_coords and gemini_lat == 0.0 and gemini_lng == 0.0:
+                        lat = override_coords[0]
+                        lng = override_coords[1]
+                    else:
+                        lat = gemini_lat
+                        lng = gemini_lng
+                    resolved_lat, resolved_lng = lat, lng
                     name = lp.get("name", "Unknown Area")
                     
                     await session.run(
@@ -108,14 +121,14 @@ async def write_extraction_to_graph(extraction: dict) -> str:
             loc_idx = next((i for i, n in enumerate(nodes) if n["label"] == "Location"), -1)
             loc_node = nodes[loc_idx] if loc_idx != -1 else {}
             lp = loc_node.get("properties", {})
-            
+
             # Create a task in Firestore for tracking
             firebase_service.create_task_from_need(need_id, {
                 "type": props.get("type", "unknown"),
                 "description": props.get("description", ""),
                 "urgency_score": props.get("urgency_score", 0.5),
-                "lat": lp.get("lat", 0.0),
-                "lng": lp.get("lng", 0.0),
+                "lat": resolved_lat,
+                "lng": resolved_lng,
                 "location_name": lp.get("name", "Unknown Area")
             })
             

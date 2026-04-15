@@ -53,7 +53,13 @@ export async function fetchVolunteers() {
     const res = await fetch(`${API_BASE}/api/graph/volunteers`);
     if (!res.ok) throw new Error("Failed to fetch volunteers");
     const data = await res.json();
-    return data.volunteers;
+    // Neo4j RETURN v, collect(s), l → each row is {v: {...props}, skills: [...], l: {...}}
+    // Normalize so components can use vol.availabilityStatus, vol.location.lat, etc.
+    return (data.volunteers ?? []).map((row: any) => ({
+      ...(row.v ?? row),
+      skills: (row.skills ?? []).map((s: any) => s?.name ?? s).filter(Boolean),
+      location: row.l ? { lat: row.l.lat, lng: row.l.lng, name: row.l.name } : null,
+    }));
   } catch (error) {
     handleApiError(error, "fetchVolunteers");
     return [];
@@ -142,15 +148,20 @@ export async function ingestDocument(file: File) {
   }
 }
 
-export async function ingestText(text: string) {
+export async function ingestText(text: string, coords?: { lat: number; lng: number }) {
   try {
     const safeText = sanitizeInput(text);
+    const body: Record<string, unknown> = { text: safeText, language: "en" };
+    if (coords) {
+      body.lat = coords.lat;
+      body.lng = coords.lng;
+    }
     const res = await fetch(`${API_BASE}/api/ingest/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: safeText, language: "en" })
+      body: JSON.stringify(body)
     });
-    
+
     if (!res.ok) throw new Error("Text ingestion failed");
     return res.json();
   } catch (error) {

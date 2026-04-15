@@ -1,17 +1,26 @@
+"use client";
+
+import React from "react";
+import { usePathname } from "next/navigation";
 import { Home, User, Trophy } from "lucide-react";
 
-export default function VolunteerLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+const NAV_ITEMS = [
+  { href: "/feed",        icon: Home,   label: "Feed"    },
+  { href: "/leaderboard", icon: Trophy, label: "Ranks"   },
+  { href: "/profile",     icon: User,   label: "Profile" },
+];
+
+export default function VolunteerLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
   return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-slate-900 shadow-2xl overflow-hidden relative">
+    <div className="flex flex-col min-h-screen max-w-md mx-auto bg-[#F5F6F1] shadow-xl overflow-hidden relative">
       {/* Top Header */}
-      <header className="bg-slate-950 border-b border-slate-800 px-4 py-3 flex items-center shrink-0">
-        <span className="text-sm font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-green-500 font-mono">
-          SYNAPSE<span className="text-slate-500">_FIELD</span>
-        </span>
+      <header className="bg-[#115E54] px-4 py-3 flex items-center gap-2.5 shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo/logo-icon.png" alt="logo" className="h-6 w-6 object-contain" />
+        <span className="text-sm font-bold text-white tracking-tight">Sanchaalan Saathi</span>
+        <span className="text-[10px] text-white/50 ml-1 hidden sm:block">Field Portal</span>
       </header>
 
       <div className="flex-1 overflow-y-auto pb-16">
@@ -19,19 +28,23 @@ export default function VolunteerLayout({
       </div>
 
       {/* Mobile Bottom Nav */}
-      <nav className="absolute bottom-0 w-full bg-slate-950 border-t border-slate-800 flex justify-around p-3 z-50">
-        <a href="/feed" className="flex flex-col items-center gap-1 text-slate-400 hover:text-cyan-400 transition-colors">
-          <Home size={18} />
-          <span className="text-[10px] font-medium">Feed</span>
-        </a>
-        <a href="/leaderboard" className="flex flex-col items-center gap-1 text-slate-400 hover:text-neon-orange transition-colors">
-          <Trophy size={18} />
-          <span className="text-[10px] font-medium">Ranks</span>
-        </a>
-        <a href="/profile" className="flex flex-col items-center gap-1 text-slate-400 hover:text-cyan-400 transition-colors">
-          <User size={18} />
-          <span className="text-[10px] font-medium">Profile</span>
-        </a>
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-gray-200 flex justify-around py-1.5 z-50 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+          const isActive = pathname === href || (href !== "/" && pathname?.startsWith(href));
+          return (
+            <a
+              key={href}
+              href={href}
+              className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-lg transition-all ${
+                isActive ? "text-[#115E54]" : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+              <span className={`text-[10px] ${isActive ? "font-bold" : "font-medium"}`}>{label}</span>
+              {isActive && <span className="w-1 h-1 rounded-full bg-[#115E54] mt-0.5" />}
+            </a>
+          );
+        })}
       </nav>
     </div>
   );

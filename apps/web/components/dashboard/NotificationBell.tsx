@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Bell, Info, AlertTriangle, CheckCircle, Check } from "lucide-react";
+import { Bell, Check } from "lucide-react";
 import { useNotifications } from "../../hooks/useFirestore";
-import { doc, updateDoc, writeBatch, collection } from "firebase/firestore";
+import { doc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
 export default function NotificationBell() {
@@ -12,7 +12,6 @@ export default function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -25,8 +24,7 @@ export default function NotificationBell() {
 
   const markRead = async (id: string) => {
     try {
-      const docRef = doc(db, "notifications", id);
-      await updateDoc(docRef, { read: true });
+      await updateDoc(doc(db, "notifications", id), { read: true });
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }
@@ -36,10 +34,7 @@ export default function NotificationBell() {
     try {
       const batch = writeBatch(db);
       notifications.forEach((n) => {
-        if (!n.read) {
-          const docRef = doc(db, "notifications", n.id);
-          batch.update(docRef, { read: true });
-        }
+        if (!n.read) batch.update(doc(db, "notifications", n.id), { read: true });
       });
       await batch.commit();
     } catch (error) {
@@ -48,76 +43,80 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="relative group" ref={dropdownRef}>
-      <button 
+    <div className="relative" ref={dropdownRef}>
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className={`p-2 rounded-lg border transition-all relative ${
-          unreadCount > 0 
-          ? "border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan shadow-[0_0_10px_rgba(0,243,255,0.2)]" 
-          : "border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700 hover:text-white"
+          unreadCount > 0
+            ? "border-[#115E54]/30 bg-[#115E54]/8 text-[#115E54]"
+            : "border-gray-200 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-300"
         }`}
       >
         <Bell size={18} className={unreadCount > 0 ? "animate-[swing_2s_ease-in-out_infinite]" : ""} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-neon-red text-white text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full animate-pulse ring-2 ring-slate-950">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
             {unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 hud-panel rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.9)] border border-neon-cyan/20 z-[100] animate-[slice-in_0.2s_ease-out] overflow-hidden">
-          <div className="p-4 border-b border-white/5 bg-black/40 flex justify-between items-center">
-            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-neon-cyan/70 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-neon-cyan rounded-full animate-pulse"></span>
-              Neural Notifications
-            </h3>
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
             {unreadCount > 0 && (
-              <button 
+              <button
                 onClick={markAllRead}
-                className="text-[9px] font-bold text-slate-500 hover:text-neon-cyan uppercase tracking-tighter transition-colors"
+                className="text-xs text-[#115E54] hover:text-[#0d4a42] font-medium transition-colors"
               >
-                Clear Signal Hub
+                Mark all read
               </button>
             )}
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+          <div className="max-h-[400px] overflow-y-auto">
             {loading ? (
-              <div className="p-10 text-center text-[10px] font-mono text-slate-500 animate-pulse">SYNCING...</div>
+              <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
             ) : notifications.length === 0 ? (
-              <div className="p-10 text-center flex flex-col items-center gap-3 opacity-30">
-                <Bell size={24} className="text-slate-700" />
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em]">Silence in Grid</p>
+              <div className="p-8 text-center flex flex-col items-center gap-2">
+                <Bell size={22} className="text-gray-300" />
+                <p className="text-sm text-gray-400">No notifications</p>
               </div>
             ) : (
-              notifications.map(n => (
-                <div 
-                  key={n.id} 
-                  className={`p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-all cursor-default relative group/item ${!n.read ? 'bg-neon-cyan/5' : ''}`}
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={`px-4 py-3 border-b border-gray-50 last:border-0 relative group/item ${
+                    !n.read ? "bg-[#115E54]/4" : "hover:bg-gray-50"
+                  }`}
                 >
-                  {!n.read && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-neon-cyan shadow-[0_0_8px_#00f3ff]"></div>}
+                  {!n.read && (
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[#115E54]" />
+                  )}
                   <div className="flex justify-between items-start mb-1">
-                    <span className={`text-[9px] font-mono px-1.5 rounded-sm border ${
-                      n.type === 'URGENT' ? 'border-neon-red/30 text-neon-red bg-neon-red/10' :
-                      n.type === 'SUCCESS' ? 'border-neon-green/30 text-neon-green bg-neon-green/10' :
-                      'border-neon-cyan/30 text-neon-cyan bg-neon-cyan/10'
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                      n.type === "URGENT"
+                        ? "border-red-200 text-red-600 bg-red-50"
+                        : n.type === "SUCCESS"
+                        ? "border-[#48A15E]/30 text-[#2A8256] bg-[#48A15E]/10"
+                        : "border-[#115E54]/20 text-[#115E54] bg-[#115E54]/8"
                     }`}>
-                      {n.type} SIGNAL
+                      {n.type}
                     </span>
-                    <span className="text-[8px] font-mono text-slate-600">
-                      {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'RECENT'}
+                    <span className="text-[10px] text-gray-400">
+                      {n.createdAt?.toDate
+                        ? n.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : "Recent"}
                     </span>
                   </div>
-                  <h4 className="text-xs font-bold text-slate-200 mb-1 line-clamp-1">{n.title}</h4>
-                  <p className="text-[10px] text-slate-500 leading-relaxed mb-3 line-clamp-2">{n.message}</p>
-                  
+                  <h4 className="text-xs font-semibold text-gray-800 mb-0.5 line-clamp-1">{n.title}</h4>
+                  <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{n.message}</p>
                   {!n.read && (
-                    <button 
+                    <button
                       onClick={() => markRead(n.id)}
-                      className="text-[9px] font-bold text-neon-cyan opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center gap-1 hover:underline"
+                      className="mt-1.5 text-[10px] text-[#115E54] opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center gap-1 hover:underline"
                     >
-                      Acknowledge <Check size={8} />
+                      Mark read <Check size={9} />
                     </button>
                   )}
                 </div>

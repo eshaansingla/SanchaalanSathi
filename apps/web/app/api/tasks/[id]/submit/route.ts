@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb, adminStorage } from '@/lib/firebase-admin';
 
-
-
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const taskId = params.id;
@@ -22,44 +20,47 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const bucket = adminStorage.bucket();
     const storagePath = `verifications/${taskId}_${Date.now()}.jpg`;
     const bucketFile = bucket.file(storagePath);
-    
-    // Read file into Buffer
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
-    await bucketFile.save(buffer, {
-      metadata: { contentType: file.type }
-    });
-    
+
+    await bucketFile.save(buffer, { metadata: { contentType: file.type } });
     await bucketFile.makePublic();
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
 
-    // Update Task doc
+    // Mark task VERIFICATION_PENDING and store image URL
     await taskRef.update({
       status: 'VERIFICATION_PENDING',
-      verificationImageUrl: publicUrl
+      verificationImageUrl: publicUrl,
     });
 
-    // Call the newly migrated serverless verifier instead of PubSub
+    // Derive the app origin from the incoming request (works on Vercel and locally)
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+    const proto = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+    const verifyUrl = `${proto}://${host}/api/verify`;
+
+    // Run verification synchronously so the response carries the final status.
+    // The verify route reads taskId, fetches the image from Storage, calls Gemini,
+    // and updates Firestore — all self-contained.
+    let finalStatus = 'VERIFICATION_PENDING';
     try {
-        const verifyUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || req.headers.get("origin")}/api/verify`;
-        fetch(verifyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId: taskId,
-              imageUrl: publicUrl,
-              expectedEvidence: taskSnap.data()?.expectedEvidence || "Generic verification"
-            })
-        }).catch(e => console.error("Async verification trigger failed", e));
+      const verifyRes = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId }),
+      });
+      if (verifyRes.ok) {
+        const verifyData = await verifyRes.json();
+        finalStatus = verifyData.status || 'VERIFICATION_PENDING';
+      }
     } catch (e) {
-        console.error("Verification trigger failed", e);
+      console.error('Verification call failed, status remains VERIFICATION_PENDING:', e);
     }
 
-    return NextResponse.json({ success: true, url: publicUrl, status: 'VERIFICATION_PENDING' });
+    return NextResponse.json({ success: true, url: publicUrl, status: finalStatus });
 
   } catch (error: any) {
-    console.error(error);
+    console.error('Submit route error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
