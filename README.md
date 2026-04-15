@@ -1,324 +1,363 @@
-# Synapse AI
+<div align="center">
 
-> **"From Chaos to Clarity to Confirmed Action"**
+<img src="apps/web/public/synapse-logo.png" alt="SynapseAI Logo" width="96" />
 
-**Synapse AI** is a cost-free, keyless community intelligence platform built for emergency management. It solves three core problems facing NGOs and disaster-response coordinators:
+# SynapseAI
 
-| Problem | Solution |
-|---------|----------|
-| **Discovery** — How do we know what's needed? | Omnichannel ingestion (text, photos, voice calls) processed by Gemini 2.5 Flash |
-| **Decision-Making** — What do we do first? | Live knowledge graph of causal pathways; hotspot visualisation; strategy simulations |
-| **Accountability** — Was it actually done? | Volunteers submit completion photos; Gemini Vision verifies before awarding XP |
+### *From Chaos to Clarity to Confirmed Action*
 
-Built by **Team CrownBreakers** for the Google International Hackathon — Smart Resource Allocation for NGOs.
+**AI-powered emergency intelligence platform for NGOs and disaster-response coordinators**
 
-Contributors: **Aishwary Srivastava, Eshaan Singla, Sukhmanpreet Singh**
+[![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com)
+[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=for-the-badge&logo=neo4j&logoColor=white)](https://neo4j.com)
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+
+**Built by Team CrownBreakers — Google International Hackathon**
+
+*Aishwary Srivastava · Eshaan Singla · Sukhmanpreet Singh*
+
+---
+
+[Features](#-features) · [Architecture](#-architecture) · [Tech Stack](#-tech-stack) · [Quick Start](#-quick-start) · [API Reference](#-api-reference) · [Deploy](#-cloud-deployment)
+
+</div>
+
+---
+
+## The Problem
+
+When disasters strike, NGO coordinators face three compounding failures:
+
+| | Problem | Real Cost |
+|---|---|---|
+| **Discovery** | Field reports arrive as unstructured WhatsApp messages, photos, and phone calls | Needs go unrecognized for hours |
+| **Decision-Making** | No visibility into causal chains — treating symptoms, not root causes | Misallocated volunteers and supplies |
+| **Accountability** | No way to confirm tasks are actually completed | Duplicate efforts, wasted resources |
+
+SynapseAI eliminates all three with a single AI-native platform — at **zero infrastructure cost**.
+
+---
+
+## What Makes SynapseAI Different
+
+> Most disaster tools are dashboards. SynapseAI is a **decision engine**.
+
+- **AI at every layer** — ingestion, verification, querying, and matching are all AI-powered
+- **Causal graph reasoning** — understands that a flood *causes* road blockages *causing* supply chain failures, not just isolated incidents
+- **Mathematically optimal matching** — Hungarian algorithm ensures the best volunteer goes to the right task
+- **Gamified accountability** — volunteers earn XP and climb a leaderboard only when AI *confirms* their work
+- **100% free-tier** — runs entirely on Neo4j AuraDB Free, Firebase Spark, and Google AI Studio. No credit card required.
 
 ---
 
 ## Features
 
-- **Omnichannel Ingestion** — Accept text reports, image uploads, and Twilio phone calls. Gemini 2.5 Flash handles OCR, translation, and audio transcription natively, with no paid GCP APIs required.
-- **Knowledge Graph** — Unstructured inputs are translated by Gemini into structured Neo4j graph nodes and relationships: `Need → Requires Skill → Spawned Task`.
-- **Tactical Dashboard** — Next.js command centre with live Google Maps, a need/task list, stats bar, and an NLP-to-Cypher query terminal.
-- **Predictive Hotspots** — Visualise geographic clusters of high-need areas across the map in real time.
-- **Strategy Simulations** — Compare recovery timelines across resource-allocation strategies using an agent-based Mesa simulation engine.
-- **Volunteer PWA** — Mobile-first progressive web app: browse tasks, claim work, submit photo proof.
-- **AI Verification** — Gemini Vision scores volunteer photo submissions and awards XP on confirmed completion.
-- **Free-Tier Only** — Designed to run entirely on Neo4j AuraDB Free, Firebase Spark, and Google AI Studio (no billing required).
+### Omnichannel Intelligence Ingestion
+
+- **Text reports** — paste or type; Gemini 2.5 Flash extracts needs, locations, skills, urgency
+- **Photo/PDF upload** — OCR and vision analysis; structural damage, medical situations, supply needs
+- **Voice calls via Twilio** — phone volunteers dictate field reports; audio transcribed and parsed in real time
+- **GPS-aware submissions** — browser geolocation attaches real coordinates to every report; graceful fallback to manual input
+
+### Knowledge Graph Engine
+
+- All ingested data becomes a **Neo4j property graph** with nodes: `Need`, `Location`, `Skill`, `Volunteer`, `Task`
+- Edges encode causal pathways: `(Need)-[:CAUSED_BY]->(Need)`, `(Need)-[:REQUIRES_SKILL]->(Skill)`, `(Need)-[:SPAWNED_TASK]->(Task)`
+- Natural language queries via **LangChain + Gemini → Cypher** — ask "Which zones have unmet medical needs?" and get live graph answers
+- Seeded with a realistic **Urban Flood demo scenario** covering multiple city zones
+
+### Optimal Volunteer Matching
+
+- **Hungarian Algorithm** (scipy `linear_sum_assignment`) computes a globally optimal assignment matrix
+- Cost function weighs **haversine distance**, **skill overlap**, and **reputation score** simultaneously
+- Auto-triggers after every new ingestion — no manual dispatch required
+- Scales from 5 to 500 volunteers without code changes
+
+### Agent-Based Strategy Simulation
+
+- **Mesa simulation engine** models volunteers as autonomous agents competing for tasks
+- Compare two allocation strategies side-by-side: *skill-first*, *proximity-first*, *random*
+- Outputs a projected timeline: tasks completed per time-step, coverage percentage, estimated resolution time
+- Lets coordinators **war-game decisions before committing resources**
+
+### Tactical Dashboard
+
+- Live **Google Maps** with volunteer pins, need hotspots, and predictive coverage overlay
+- **Kanban board** — needs and tasks organized by urgency (OPEN → CLAIMED → SUBMITTED → VERIFIED)
+- **Stats bar** — total reports, pending needs, active volunteers, coverage percentage
+- **Analytics panel** — trend lines and distribution charts
+- **NLP query terminal** — type plain English, get live graph data
+- **Volunteer registration** with GPS auto-detection
+
+### Volunteer PWA
+
+- **Mobile-first** Progressive Web App — installable on Android and iOS
+- Browse open tasks on a live feed with skill-match indicators
+- **One-tap claim** — locks the task and notifies the coordinator
+- **Photo proof submission** — camera or file upload directly from the field
+- Works on **low-bandwidth connections**
+
+### AI-Powered Verification & Gamification
+
+- **Gemini Vision** inspects submitted photos and scores completion confidence
+- Auto-awards XP on verified completion — coordinators never manually sign off
+- **XP leaderboard** with podium visualization for top 3 volunteers
+- **Level system** — 10 levels with thresholds from 0 to 5000 XP
+- **Achievement badges** — First Mission, Veteran, Elite, XP Hunter, Legend
+- Reputation score carries forward to influence future matching priority
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Browser / PWA                         │
-│                       apps/web  :3000                        │
-│   Dashboard  ·  Volunteer Feed  ·  Task Detail  ·  Map       │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ REST / JSON
-┌───────────────────────────▼─────────────────────────────────┐
-│               FastAPI Backend  services/backend  :8000        │
-│                                                              │
-│  /api/ingest  →  Gemini 2.5 Flash  →  Graph Writer           │
-│  /api/graph   →  Neo4j Async Driver                          │
-│  /api/sim     →  Mesa Simulation Engine                      │
-│  /api/seed    →  Demo data loader                            │
-└──────────┬───────────────────────────────┬──────────────────┘
-           │                               │
-    ┌──────▼──────┐                 ┌──────▼──────┐
-    │   Neo4j     │                 │  Firebase   │
-    │  AuraDB     │                 │  Firestore  │
-    │  (Graph DB) │                 │  (Tasks/    │
-    └─────────────┘                 │   Needs)    │
-                                    └─────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                      Browser / PWA  :3000                          │
+│                                                                   │
+│   ┌─────────────────────┐      ┌──────────────────────────────┐   │
+│   │  Coordinator         │      │  Volunteer PWA               │   │
+│   │  Dashboard           │      │  Feed · Task · Profile       │   │
+│   │  Map · Sim · Graph   │      │  Leaderboard · Achievements  │   │
+│   └──────────┬──────────┘      └──────────────┬───────────────┘   │
+└──────────────┼────────────────────────────────┼───────────────────┘
+               │ Next.js API Routes              │ REST / Firestore
+               │ /api/tasks, /api/verify         │
+┌──────────────▼────────────────────────────────┼───────────────────┐
+│              FastAPI Backend  :8000            │                   │
+│                                               │                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────▼────────┐          │
+│  │ Ingest Layer │  │ Graph Layer  │  │ Firebase Admin  │          │
+│  │              │  │              │  │ Firestore · Auth│          │
+│  │ Text / Image │  │ LangChain    │  └─────────────────┘          │
+│  │ Voice / GPS  │  │ NLP → Cypher │                               │
+│  └──────┬───────┘  └──────┬───────┘                               │
+│         │                 │                                        │
+│  ┌──────▼───────────────────────────────────────────────────┐     │
+│  │              Gemini 2.5 Flash                            │     │
+│  │   OCR · Vision · Audio · Entity Extraction · Scoring     │     │
+│  └──────────────────────────────────────────────────────────┘     │
+│                                                                    │
+│  ┌────────────────────┐   ┌────────────────────┐                  │
+│  │ Engine: Matcher    │   │ Engine: Simulator  │                  │
+│  │ Hungarian Algo     │   │ Mesa Agent-Based   │                  │
+│  │ Haversine + Skills │   │ Strategy Compare   │                  │
+│  └────────┬───────────┘   └────────────────────┘                  │
+└───────────┼────────────────────────────────────────────────────────┘
+            │
+    ┌───────▼────────┐
+    │  Neo4j AuraDB  │
+    │  Knowledge     │
+    │  Graph         │
+    └────────────────┘
 ```
 
-**External APIs used:**
-- Google Gemini 2.5 Flash — text, vision, and audio processing
-- Neo4j AuraDB — graph database
-- Firebase Firestore + Auth — real-time task/need storage and auth
-- Google Maps JavaScript API — geospatial visualisation
-- Twilio — inbound voice call handling
+**Data flow:**  
+`Field Report` → `Gemini Extraction` → `Neo4j Graph` → `Auto-Matcher` → `Volunteer PWA` → `Photo Proof` → `Gemini Verification` → `XP Award`
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
-| Backend | FastAPI, Python 3.11+, uvicorn |
-| AI | Google Gemini 2.5 Flash (`google-generativeai`), LangChain |
-| Graph DB | Neo4j AuraDB (async driver v5) |
-| Auth & Storage | Firebase Auth, Firestore, Firebase Admin SDK |
-| Simulation | Mesa (agent-based modelling), NumPy, scikit-learn |
-| Voice | Twilio |
-| Maps | Google Maps JavaScript API |
-| Containerisation | Docker, Docker Compose |
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Frontend** | Next.js 14 · React 18 · TypeScript | Unified app router — dashboard + volunteer PWA |
+| **Styling** | Tailwind CSS · Custom design system | Brand palette · Responsive · PWA-ready |
+| **AI** | Google Gemini 2.5 Flash | Text extraction · Vision · Audio · NL→Cypher |
+| **LangChain** | `langchain-google-genai` | Prompt chaining, NLP-to-Cypher pipeline |
+| **Graph DB** | Neo4j AuraDB (async v5 driver) | Causal knowledge graph, geospatial queries |
+| **Realtime DB** | Firebase Firestore | Task/need state, live feeds, notifications |
+| **Auth** | Firebase Auth (Google OAuth) | Coordinator + volunteer identity |
+| **Backend** | FastAPI · Python 3.11+ · uvicorn | REST API, background tasks, webhook handling |
+| **Matching** | NumPy · SciPy `linear_sum_assignment` | Hungarian algorithm for optimal dispatch |
+| **Simulation** | Mesa · NumPy · scikit-learn | Agent-based scenario modelling |
+| **Voice** | Twilio (Voice webhook) | Phone-in field report transcription |
+| **Maps** | Google Maps JavaScript API | Volunteer pins, hotspot overlay, routing |
+| **Containers** | Docker · Docker Compose | One-command local setup |
+| **Deployment** | Vercel (frontend) · Render (backend) | Free-tier cloud hosting |
+
+---
+
+## Quick Start
+
+### Option A — Docker (recommended)
+
+```bash
+# 1. Clone
+git clone https://github.com/aishwarysrivastava1/SynapseAI.git
+cd SynapseAI
+
+# 2. Configure credentials
+cp apps/web/.env.example apps/web/.env.local
+cp services/backend/.env.example services/backend/.env
+# Fill in your API keys (see Credentials section below)
+
+# 3. Build and run both services
+docker-compose up --build
+```
+
+| Service | URL |
+|---|---|
+| Dashboard + Volunteer PWA | http://localhost:3000 |
+| FastAPI backend | http://localhost:8000 |
+| Swagger docs | http://localhost:8000/docs |
+
+### Option B — Manual
+
+**Backend**
+```bash
+cd services/backend
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env      # fill in keys
+uvicorn main:app --reload --port 8000
+```
+
+**Frontend**
+```bash
+cd apps/web
+npm install
+cp .env.example .env.local   # fill in keys
+npm run dev                  # http://localhost:3000
+```
+
+**Load demo data**
+```bash
+curl -X POST http://localhost:8000/api/seed
+```
+
+This seeds the **Urban Flood scenario** — a realistic multi-zone disaster with needs, volunteer assignments, causal chains, and skill requirements.
+
+---
+
+## Credentials
+
+All services are **free-tier only**. No billing required.
+
+| Variable | Service | Where to get it |
+|---|---|---|
+| `GEMINI_API_KEY` | Google AI Studio | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+| `NEO4J_URI` | Neo4j AuraDB Free | [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura/) — create free DB |
+| `NEO4J_USER` | Neo4j AuraDB | Same page — default `neo4j` |
+| `NEO4J_PASSWORD` | Neo4j AuraDB | Generated on DB creation |
+| `NEXT_PUBLIC_FIREBASE_*` | Firebase | Console → Project Settings → Your apps → Web |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin | Console → Service Accounts → Generate new private key |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps | Cloud Console → APIs & Services → Credentials |
+| `TWILIO_ACCOUNT_SID` / `AUTH_TOKEN` | Twilio | [twilio.com/console](https://www.twilio.com/console) — optional |
+| `NEXT_PUBLIC_BACKEND_URL` | — | URL of your FastAPI instance (default: `http://localhost:8000`) |
+
+---
+
+## API Reference
+
+Full interactive docs at `http://localhost:8000/docs`.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `POST` | `/api/ingest/text` | Text report → Gemini → graph + auto-assign |
+| `POST` | `/api/ingest/document` | Image/PDF → Gemini Vision → graph |
+| `POST` | `/api/ingest/voice` | Twilio webhook → transcribe → graph |
+| `GET` | `/api/graph/nodes` | All graph nodes |
+| `GET` | `/api/graph/needs` | Active needs |
+| `GET` | `/api/graph/volunteers` | Volunteer roster with skills and locations |
+| `POST` | `/api/graph/query` | NLP query → LangChain → Cypher → live results |
+| `POST` | `/api/sim/run` | Run Mesa simulation for a scenario |
+| `POST` | `/api/sim/compare` | Compare two allocation strategies |
+| `GET` | `/api/analytics/summary` | Aggregate stats for dashboard |
+| `POST` | `/api/seed` | Load Urban Flood demo scenario |
+
+---
+
+## Cloud Deployment
+
+### Backend → Render (Free)
+
+1. Sign in to [render.com](https://render.com) with GitHub
+2. **New → Web Service** → connect this repo
+3. Root Directory: `services/backend` · Build: `pip install -r requirements.txt` · Start: `uvicorn main:app --host 0.0.0.0 --port 10000`
+4. Add all backend env vars → **Deploy**
+
+### Frontend → Vercel (Free)
+
+1. Sign in to [vercel.com](https://vercel.com) with GitHub
+2. **Add New → Project** → import this repo
+3. Root Directory: `apps/web`
+4. Add all frontend env vars; set `NEXT_PUBLIC_BACKEND_URL` to your Render URL
+5. **Deploy**
 
 ---
 
 ## Project Structure
 
 ```
-synapse-ai/
+SynapseAI/
 ├── apps/
-│   ├── web/                   # Main unified Next.js app (dashboard + volunteer PWA)
-│   │   ├── app/               # App Router pages and API routes
-│   │   ├── components/        # UI components (map, dashboard, volunteer, upload)
-│   │   ├── hooks/             # Custom React hooks (Firestore)
-│   │   ├── lib/               # Firebase, auth, API client, shared types
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── dashboard/             # Standalone advanced dashboard (deck.gl, force-graph)
-│   └── volunteer/             # Standalone volunteer PWA (react-webcam, PWA)
+│   └── web/                        # Unified Next.js 14 app
+│       ├── app/
+│       │   ├── (dashboard)/        # Coordinator dashboard route group
+│       │   ├── (volunteer)/        # Volunteer PWA route group
+│       │   │   ├── feed/           # Task feed
+│       │   │   ├── leaderboard/    # XP leaderboard + podium
+│       │   │   ├── profile/        # Skills, XP bar, achievements
+│       │   │   └── task/[id]/      # Task detail + photo submission
+│       │   ├── api/                # Next.js API routes
+│       │   │   ├── tasks/[id]/claim/
+│       │   │   ├── tasks/[id]/submit/
+│       │   │   ├── tasks/generate/
+│       │   │   └── verify/
+│       │   └── login/              # Firebase Google OAuth
+│       ├── components/
+│       │   ├── dashboard/          # StatsBar, NeedList, TaskKanban, SimulationPanel, AnalyticsPanel
+│       │   ├── map/                # SynapseMap (Google Maps + hotspots)
+│       │   ├── upload/             # FileUpload (text + image ingestion)
+│       │   └── volunteer/          # TaskCard, VoiceBriefing
+│       ├── hooks/                  # useFirestore, useLeaderboard, useGeolocation, useToast
+│       └── lib/                    # firebase.ts, auth.ts, api.ts
 ├── services/
-│   └── backend/               # FastAPI intelligence core
-│       ├── api/               # Route handlers (graph, ingest, seed, simulation, voice)
-│       ├── engine/            # Matchmaker and Mesa simulator
-│       ├── services/          # Gemini, Neo4j, graph writer, LangChain/Cypher
-│       ├── main.py            # FastAPI app entry point
-│       ├── requirements.txt
-│       └── Dockerfile
+│   └── backend/
+│       ├── api/                    # FastAPI route handlers
+│       ├── engine/
+│       │   ├── matcher.py          # Hungarian algorithm dispatcher
+│       │   └── simulator.py        # Mesa agent-based simulator
+│       └── services/
+│           ├── gemini_service.py   # Gemini 2.5 Flash integration
+│           ├── langchain_cypher.py # NLP → Cypher pipeline
+│           ├── graph_writer.py     # Neo4j write layer + GPS resolution
+│           ├── neo4j_service.py    # Async Neo4j driver
+│           └── firebase_service.py # Firebase Admin SDK
 ├── data/
-│   └── seed_graph.cypher      # Urban flood demo scenario for Neo4j
-├── firestore.rules            # Firestore security rules
-└── docker-compose.yml
+│   └── seed_graph.cypher           # Urban Flood demo scenario
+├── docker-compose.yml
+└── firestore.rules
 ```
 
 ---
 
-## Prerequisites
+## Team
 
-- **Docker & Docker Compose** (recommended for Quick Start) — or:
-  - Node.js 18+ and npm
-  - Python 3.11+ — **Windows:** during installation, check **"Add Python to PATH"**
-- API credentials (all free tier) — see [Obtaining API Keys](#obtaining-api-keys) below
+**Team CrownBreakers** — Google International Hackathon
 
----
-
-## Obtaining API Keys
-
-All services used have a free tier. Create accounts and collect the following:
-
-**1. Google Gemini API Key**
-Go to [Google AI Studio](https://aistudio.google.com/app/apikey) → click **Get API Key** → **Create API key**.
-
-**2. Neo4j AuraDB (Graph Database)**
-Go to [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura/) → create a **Free** database.
-Save the **Connection URI** (`neo4j+s://...`) and the generated **Password**.
-
-**3. Firebase (Auth + Firestore)**
-Go to [Firebase Console](https://console.firebase.google.com/) → create a project.
-- **Client keys:** Project Settings → Your apps → Add Web App → copy the config values.
-- **Admin key (`FIREBASE_SERVICE_ACCOUNT_JSON`):** Project Settings → Service Accounts → **Generate new private key** → download the `.json` file → open it and paste the entire contents as a single-line string into your `.env`.
-
-**4. Google Maps**
-Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → **Create API key**.
-Enable the **Maps JavaScript API** for that key.
-
-**5. Twilio (optional — voice ingestion only)**
-Go to [twilio.com/console](https://www.twilio.com/console) → copy your **Account SID** and **Auth Token** → buy or use a trial phone number.
-
----
-
-## Quick Start (Docker)
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/aishwarysrivastava1/SynapseAI.git
-cd synapse-ai
-
-# 2. Set up environment variables
-cp .env.example .env.local
-# Edit .env.local and fill in your API keys
-
-# 3. Copy env files to sub-services
-cp apps/web/.env.example apps/web/.env.local
-cp services/backend/.env.example services/backend/.env
-# Fill in the same values
-
-# 4. Build and run
-docker-compose up --build
-```
-
-| Service | URL |
-|---------|-----|
-| Frontend (Dashboard + Volunteer PWA) | http://localhost:3000 |
-| Backend API (FastAPI) | http://localhost:8000 |
-| API Docs (Swagger UI) | http://localhost:8000/docs |
-
----
-
-## Manual Setup
-
-### Backend
-
-```bash
-cd services/backend
-
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your credentials
-
-# Start the server
-uvicorn main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd apps/web
-
-npm install
-
-# Configure environment
-cp .env.example .env.local
-# Edit .env.local with your credentials
-
-npm run dev     # Development — http://localhost:3000
-npm run build   # Production build
-npm start       # Production server
-```
-
----
-
-## Environment Variables
-
-Copy [`.env.example`](.env.example) to `.env.local` (root), [`apps/web/.env.example`](apps/web/.env.example) to `apps/web/.env.local`, and [`services/backend/.env.example`](services/backend/.env.example) to `services/backend/.env`.
-
-| Variable | Used By | Description |
-|----------|---------|-------------|
-| `GEMINI_API_KEY` | Backend | Google Gemini 2.5 Flash API key |
-| `NEO4J_URI` | Backend | Neo4j connection URI (e.g. `neo4j+s://xxx.databases.neo4j.io`) |
-| `NEO4J_USER` | Backend | Neo4j username |
-| `NEO4J_PASSWORD` | Backend | Neo4j password |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Frontend | Firebase web API key |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Frontend | Firebase auth domain |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Frontend + Backend | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Frontend | Firebase Storage bucket |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Frontend | Firebase messaging sender ID |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Frontend | Firebase app ID |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Frontend (API routes) + Backend | Firebase Admin service account (full JSON string) |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Frontend | Google Maps JavaScript API key |
-| `TWILIO_ACCOUNT_SID` | Frontend (API routes) | Twilio Account SID |
-| `TWILIO_AUTH_TOKEN` | Frontend (API routes) | Twilio Auth Token |
-| `TWILIO_PHONE_NUMBER` | Frontend (API routes) | Twilio phone number (E.164 format) |
-| `NEXT_PUBLIC_BACKEND_URL` | Frontend | URL of the FastAPI backend (default: `http://localhost:8000`) |
-
----
-
-## API Reference
-
-All endpoints are documented interactively at `http://localhost:8000/docs` (Swagger UI).
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `POST` | `/api/ingest/text` | Ingest a text report → Gemini extracts needs → writes to graph |
-| `POST` | `/api/ingest/image` | Ingest an image → Gemini Vision → needs → graph |
-| `POST` | `/api/ingest/voice` | Process a Twilio voice webhook → transcribe → needs → graph |
-| `GET` | `/api/graph/nodes` | Fetch all graph nodes |
-| `GET` | `/api/graph/needs` | Fetch all active needs |
-| `POST` | `/api/graph/query` | Natural language query → LangChain → Cypher → results |
-| `POST` | `/api/sim/run` | Run a Mesa agent-based simulation |
-| `POST` | `/api/sim/compare` | Compare two strategy scenarios |
-| `POST` | `/api/seed` | Seed the database with the Urban Flood demo scenario |
-
----
-
-## Seeding Demo Data
-
-To load the Urban Flood scenario for a live demo:
-
-```bash
-# Option 1: HTTP request (server must be running)
-curl -X POST http://localhost:8000/api/seed
-
-# Option 2: Run the Cypher script directly against Neo4j
-# Open Neo4j Browser → paste contents of data/seed_graph.cypher
-```
-
-This creates a realistic graph of flood-related needs, skills, tasks, and volunteer assignments across several city zones.
-
----
-
-## Apps Overview
-
-| App | Path | Description |
-|-----|------|-------------|
-| **Web** (main) | `apps/web/` | Unified Next.js 14 app — admin dashboard and volunteer PWA in one deployment |
-| **Dashboard** (advanced) | `apps/dashboard/` | Standalone dashboard with deck.gl 3D layers, React Force Graph visualisation, and direct Neo4j driver integration |
-| **Volunteer** (PWA) | `apps/volunteer/` | Standalone volunteer PWA with webcam capture and offline-first capabilities |
-
-The `apps/web` app is the primary deployment target wired into `docker-compose.yml`. The `dashboard` and `volunteer` apps are alternate standalone frontends for specific deployment scenarios.
-
----
-
-## Cloud Deployment
-
-### Backend → Render.com (Free)
-
-1. Go to [render.com](https://render.com) and sign in with GitHub.
-2. Click **New +** → **Web Service** → connect this repo.
-3. Set the following:
-   - **Root Directory:** `services/backend`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port 10000`
-4. Add all backend environment variables under **Environment**.
-5. Deploy — copy the live URL Render provides (e.g. `https://synapse-backend.onrender.com`).
-
-### Frontend → Vercel (Free)
-
-1. Go to [vercel.com](https://vercel.com) and sign in with GitHub.
-2. Click **Add New** → **Project** → import this repo.
-3. Set **Root Directory** to `apps/web`.
-4. Add all frontend environment variables, setting `NEXT_PUBLIC_BACKEND_URL` to your Render URL from above.
-5. Click **Deploy**.
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m "feat: describe your change"`
-4. Push to your fork: `git push origin feature/your-feature`
-5. Open a Pull Request
-
-Please ensure your `.env.local` / `.env` files are never committed — they are excluded by `.gitignore`.
+| Name | Role |
+|---|---|
+| **Aishwary Srivastava** | Full-stack lead · AI pipeline · Graph engine |
+| **Eshaan Singla** | Backend · Matching algorithm · Simulation |
+| **Sukhmanpreet Singh** | Frontend · Volunteer PWA · UX |
 
 ---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — free to use, modify, and deploy.
+
+---
+
+<div align="center">
+
+*Built with urgency. Designed for impact.*
+
+**SynapseAI — because every second in a disaster counts.**
+
+</div>
