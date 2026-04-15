@@ -4,7 +4,7 @@
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "env": {
-    "NEXT_PUBLIC_BACKEND_URL": "@next_public_backend_url"
+    "NEXT_PUBLIC_BACKEND_URL": "next_public_backend_url"
   },
   "headers": [
     {
