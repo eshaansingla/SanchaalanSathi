@@ -32,7 +32,7 @@ async function handleGoogleSignIn(
   } catch (e: unknown) {
     const code = (e as { code?: string })?.code ?? "";
     if (code === "auth/popup-closed-by-user") {
-      setError("Google sign-in window was closed — click the button to retry.");
+      setError("Sign-in window closed. If this keeps happening, your domain may not be authorised — add it in Firebase Console → Authentication → Settings → Authorised domains.");
     } else if (code === "auth/cancelled-popup-request" || code === "auth/popup-in-flight") {
       setError("Sign-in already in progress — please wait a moment.");
     } else if (code === "auth/popup-blocked") {

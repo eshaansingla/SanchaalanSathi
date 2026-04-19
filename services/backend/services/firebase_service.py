@@ -101,11 +101,15 @@ def _parse_service_account_json(raw: str) -> dict | None:
         result = _try_parse(candidate)
         if result is not None:
             logger.info(f"FIREBASE_SERVICE_ACCOUNT_JSON parsed via candidate[{i}]")
-            # Always normalize private_key: replace literal \n (two chars) with real newline.
-            # Required regardless of parse method — YAML, JSON with escaped chars, etc.
             pk = result.get("private_key", "")
-            if isinstance(pk, str) and "\\n" in pk:
-                result["private_key"] = pk.replace("\\n", "\n")
+            if isinstance(pk, str):
+                # Two-pass normalization handles both single and double-escaped newlines:
+                # Pass 1: \\n (4 raw chars, double-escaped) → \n (2 chars: backslash+n)
+                pk = pk.replace("\\\\n", "\\n")
+                # Pass 2: \n (2 chars: backslash+n) → real newline character
+                pk = pk.replace("\\n", "\n")
+                result["private_key"] = pk
+                logger.info(f"private_key after normalization (first 60): {repr(pk[:60])}")
             return result
 
     # Diagnostic: log first 120 chars and length to help diagnose format issues
