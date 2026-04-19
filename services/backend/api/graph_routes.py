@@ -1,11 +1,14 @@
+import os
 import pydantic
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Optional, Dict, Any
 from services.neo4j_service import neo4j_service
 from services.langchain_cypher import text_to_cypher
 import logging
 
 logger = logging.getLogger(__name__)
+
+INTERNAL_SERVICE_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "")
 
 router = APIRouter()
 
@@ -76,11 +79,16 @@ class NodeUpdateReq(pydantic.BaseModel):
     updates: Dict[str, Any]
 
 @router.post("/update-node")
-async def update_node(req: NodeUpdateReq):
+async def update_node(req: NodeUpdateReq, x_service_secret: str = Header(default=None)):
+    # Internal-only endpoint — reject if secret is configured and header doesn't match
+    if INTERNAL_SERVICE_SECRET and x_service_secret != INTERNAL_SERVICE_SECRET:
+        logger.warning(f"update-node rejected: invalid service secret for nodeType={req.nodeType} id={req.nodeId}")
+        raise HTTPException(status_code=401, detail="Unauthorized — invalid service secret")
+
     node_type = req.nodeType
     node_id = req.nodeId
     updates = req.updates
-    
+
     if not node_type or not node_id or not updates:
         raise HTTPException(status_code=400, detail="Missing required fields")
         

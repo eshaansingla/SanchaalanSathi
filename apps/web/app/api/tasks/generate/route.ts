@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import { verifyFirebaseToken, requireAuth } from '@/lib/verify-auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -9,6 +10,8 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? (
     : 'http://localhost:8000'
 );
 
+const MAX_NEED_IDS = 20;
+
 const PROMPT = `Given these community needs, generate 1-2 specific volunteer micro-tasks per need.
 Each task must be completable in 1-4 hours by one person.
 Output ONLY a JSON array.
@@ -17,90 +20,102 @@ Output ONLY a JSON array.
 NEEDS: `;
 
 export async function POST(req: Request) {
+  // Auth guard — requires a valid Firebase ID token
+  const decoded = await verifyFirebaseToken(req);
+  const deny = requireAuth(decoded);
+  if (deny) return deny;
+
   try {
-    const { needIds } = await req.json();
-    if (!needIds || !needIds.length) {
-      return NextResponse.json({ error: 'needIds required' }, { status: 400 });
+    const body = await req.json();
+    const { needIds } = body;
+
+    if (!needIds || !Array.isArray(needIds) || needIds.length === 0) {
+      return NextResponse.json({ error: 'needIds must be a non-empty array' }, { status: 400 });
+    }
+    if (needIds.length > MAX_NEED_IDS) {
+      return NextResponse.json({ error: `Maximum ${MAX_NEED_IDS} needIds per request` }, { status: 400 });
+    }
+    if (needIds.some((id: unknown) => typeof id !== 'string' || !id.trim())) {
+      return NextResponse.json({ error: 'All needIds must be non-empty strings' }, { status: 400 });
     }
 
-    // Since we're in Next.js, we call the Python backend to get the actual Need nodes.
-    // For expediency in a hackathon, let's assume we pass the full Need objects from the frontend
-    // if the frontend already has them, or we fetch them here.
-    const fetchedNeeds = [];
+    const fetchedNeeds: unknown[] = [];
     for (const id of needIds) {
-       const res = await fetch(`${BACKEND_URL}/api/graph/needs/${id}`);
-       if (res.ok) fetchedNeeds.push(await res.json());
+      const res = await fetch(`${BACKEND_URL}/api/graph/needs/${encodeURIComponent(id)}`);
+      if (res.ok) fetchedNeeds.push(await res.json());
     }
 
     if (!fetchedNeeds.length) {
-      return NextResponse.json({ error: 'No needs found' }, { status: 404 });
+      return NextResponse.json({ error: 'No needs found for provided IDs' }, { status: 404 });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(PROMPT + JSON.stringify(fetchedNeeds));
     const text = result.response.text();
-    
-    // Parse JSON — strip markdown fences if present
+
     let parsedText = text.trim();
-    if (parsedText.includes("```json")) {
-      parsedText = parsedText.split("```json")[1].split("```")[0].trim();
-    } else if (parsedText.includes("```")) {
-      parsedText = parsedText.split("```")[1].split("```")[0].trim();
+    if (parsedText.includes('```json')) {
+      parsedText = parsedText.split('```json')[1].split('```')[0].trim();
+    } else if (parsedText.includes('```')) {
+      parsedText = parsedText.split('```')[1].split('```')[0].trim();
     }
-    let tasks: any[];
+
+    let tasks: Record<string, unknown>[];
     try {
-      tasks = JSON.parse(parsedText);
-      if (!Array.isArray(tasks)) throw new Error("Expected array");
+      const parsed = JSON.parse(parsedText);
+      if (!Array.isArray(parsed)) throw new Error('Expected array');
+      tasks = parsed;
     } catch {
-      return NextResponse.json({ error: "AI returned malformed task list" }, { status: 502 });
+      return NextResponse.json({ error: 'AI returned malformed task list' }, { status: 502 });
     }
 
     const generatedTasks = [];
+    const serviceSecret = process.env.INTERNAL_SERVICE_SECRET ?? '';
 
-    // Write to Firestore & Neo4j
     for (const t of tasks) {
-      // Create Firebase Task Document
       const taskRef = adminDb.collection('tasks').doc();
       const neoTaskId = `t_${taskRef.id}`;
-      
+
       const firestoreTask = {
-        neoTaskId: neoTaskId,
-        neoNeedId: t.for_need_id,
-        title: t.title,
-        description: t.description,
-        requiredSkill: t.required_skill,
-        expectedEvidence: t.expected_evidence,
-        xpReward: t.xp_reward || 50,
-        status: "OPEN",
-        location: { lat: 0, lng: 0, name: "Pending" }, // Would map from need location
+        neoTaskId,
+        neoNeedId: typeof t.for_need_id === 'string' ? t.for_need_id : null,
+        title: String(t.title ?? '').slice(0, 300),
+        description: String(t.description ?? '').slice(0, 2000),
+        requiredSkill: String(t.required_skill ?? ''),
+        expectedEvidence: String(t.expected_evidence ?? ''),
+        xpReward: typeof t.xp_reward === 'number' ? Math.min(Math.max(t.xp_reward, 0), 500) : 50,
+        status: 'OPEN',
+        location: { lat: 0, lng: 0, name: 'Pending' },
         claimedBy: null,
         claimedAt: null,
         verificationImageUrl: null,
         verificationResult: null,
+        createdBy: decoded!.uid,
         createdAt: new Date(),
       };
-      
+
       await taskRef.set(firestoreTask);
-      
-      // Update Neo4j Graph
+
+      // Sync to Neo4j
+      const syncHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (serviceSecret) syncHeaders['x-service-secret'] = serviceSecret;
+
       await fetch(`${BACKEND_URL}/api/graph/update-node`, {
-         method: 'POST',
-         headers: {'Content-Type': 'application/json'},
-         body: JSON.stringify({
-            nodeType: 'Task',
-            nodeId: neoTaskId,
-            updates: { id: neoTaskId, title: t.title, status: "OPEN" }
-         })
+        method: 'POST',
+        headers: syncHeaders,
+        body: JSON.stringify({
+          nodeType: 'Task',
+          nodeId: neoTaskId,
+          updates: { id: neoTaskId, title: firestoreTask.title, status: 'OPEN' },
+        }),
       });
-      // In a real app we'd also link the SPAWNED_TASK edge here via a custom Cypher endpoint on backend
-      
+
       generatedTasks.push({ id: taskRef.id, ...firestoreTask });
     }
 
     return NextResponse.json({ success: true, tasks: generatedTasks });
 
   } catch (error: unknown) {
-    console.error(error);
     const msg = process.env.NODE_ENV === 'production'
       ? 'Internal server error'
       : (error instanceof Error ? error.message : String(error));

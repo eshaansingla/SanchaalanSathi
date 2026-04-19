@@ -1,8 +1,18 @@
 import os
-from fastapi import FastAPI
+import time
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 from api import graph_routes, seed_routes, ingest_routes, simulation_routes, analytics_routes, volunteer_routes
 from api.auth_routes       import router as auth_router
@@ -48,6 +58,26 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        duration = time.monotonic() - start
+        logger.error(
+            f"{request.method} {request.url.path} → 500 ({duration:.3f}s) UNHANDLED: {exc}"
+        )
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
+    duration = time.monotonic() - start
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(
+        level,
+        f"{request.method} {request.url.path} → {response.status_code} ({duration:.3f}s)",
+    )
+    return response
 
 
 @app.get("/health")

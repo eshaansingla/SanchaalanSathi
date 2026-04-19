@@ -19,6 +19,18 @@ router = APIRouter()
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 validator = RequestValidator(TWILIO_AUTH_TOKEN)
 
+INGEST_API_KEY = os.getenv("INGEST_API_KEY", "")
+
+
+def _verify_ingest_key(x_api_key: str = Header(default=None)):
+    """API-key guard for public ingest endpoints.
+    If INGEST_API_KEY env var is set, requests must include a matching x-api-key header.
+    Leave unset to allow open ingestion in development.
+    """
+    if INGEST_API_KEY and x_api_key != INGEST_API_KEY:
+        logger.warning("Ingest endpoint rejected: missing or invalid x-api-key")
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
 # --- Helper for Twilio Validation ---
 async def verify_twilio_signature(request: Request, x_twilio_signature: str = Header(None)):
     if not TWILIO_AUTH_TOKEN:
@@ -58,7 +70,7 @@ class TextIngestReq(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
 
-@router.post("/text")
+@router.post("/text", dependencies=[Depends(_verify_ingest_key)])
 async def ingest_text(req: TextIngestReq, background_tasks: BackgroundTasks):
     extraction = await extract_entities(req.text, req.language)
     if not extraction or "error" in extraction and extraction["error"]:
@@ -74,7 +86,7 @@ async def ingest_text(req: TextIngestReq, background_tasks: BackgroundTasks):
 
     return {"success": True, "need_id": need_id, "nodes_created": len(extraction.get("nodes", []))}
 
-@router.post("/document")
+@router.post("/document", dependencies=[Depends(_verify_ingest_key)])
 async def ingest_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     image_bytes = await file.read()
     mime_type = file.content_type or "image/jpeg"

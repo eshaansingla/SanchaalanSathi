@@ -1,14 +1,63 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
+import {
+  Building2, Users, BarChart3, Zap, Shield, Globe,
+  Menu, X, ArrowRight, MapPin, Bell, CheckCircle2,
+  ChevronRight, Star, TrendingUp, Clock,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { signInWithGoogle as firebaseSignIn, logoutUser } from "@/lib/firebase-auth";
 import { api } from "@/lib/ngo-api";
 import UserProfile from "@/components/auth/UserProfile";
 
-// ── Icons ────────────────────────────────────────────────────────────────────
+// ── Shared sign-in logic ──────────────────────────────────────────────────────
+
+async function handleGoogleSignIn(
+  role: "ngo_admin" | "volunteer",
+  inviteCode: string,
+  router: ReturnType<typeof useRouter>,
+  setError: (e: string) => void,
+  setBusy: (b: boolean) => void,
+) {
+  setError("");
+  setBusy(true);
+  try {
+    const firebaseUser = await firebaseSignIn();
+    try {
+      const data = await api.googleAuth({
+        email: firebaseUser.email!,
+        firebase_uid: firebaseUser.uid,
+        role,
+        invite_code: role === "volunteer" ? inviteCode.trim() || undefined : undefined,
+      });
+      localStorage.setItem("ngo_token", data.token);
+      document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+      if (data.needs_ngo_setup) router.replace("/ngo/setup");
+      else if (role === "ngo_admin") router.replace("/ngo/dashboard");
+      else router.replace("/vol/dashboard");
+    } catch {
+      router.replace(role === "ngo_admin" ? "/ngo/dashboard" : "/vol/dashboard");
+    }
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code ?? "";
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+      setError("Sign-in was cancelled.");
+    } else if (code === "auth/popup-blocked") {
+      setError("Popup blocked — allow popups for this site and try again.");
+    } else if (code === "auth/unauthorized-domain") {
+      setError("This domain is not authorised in Firebase. Add it under Authentication → Settings → Authorised domains.");
+    } else {
+      setError((e as Error).message || "Sign-in failed. Please try again.");
+    }
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ── Google icon ───────────────────────────────────────────────────────────────
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -19,136 +68,222 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <circle cx="7" cy="7" r="7" fill="rgba(72,161,94,0.2)"/>
-    <path d="M4 7l2 2 4-4" stroke="#48A15E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-// ── Feature content per role ─────────────────────────────────────────────────
-
-const FEATURES = {
-  ngo_admin: {
-    headline: "Coordinate your NGO\nwith AI-powered tools",
-    sub: "Manage volunteers, allocate resources, and get real-time analytics — all in one place.",
-    bullets: [
-      "AI-matched volunteer assignments",
-      "Real-time task & resource tracking",
-      "Analytics dashboard with insights",
-      "Invite volunteers with a single code",
-    ],
-    stat1: { value: "AI-Powered", label: "Matching Engine" },
-    stat2: { value: "Real-time", label: "Coordination" },
-    stat3: { value: "Zero Cost", label: "To Get Started" },
-  },
-  volunteer: {
-    headline: "Make a difference\nwhere it matters most",
-    sub: "Accept tasks matched to your skills, track your impact, and stay connected with your NGO.",
-    bullets: [
-      "Tasks matched to your skills",
-      "Flexible availability scheduling",
-      "Instant assignment notifications",
-      "Track your volunteer impact",
-    ],
-    stat1: { value: "Skill-based", label: "Task Matching" },
-    stat2: { value: "Flexible", label: "Scheduling" },
-    stat3: { value: "Instant", label: "Notifications" },
-  },
-};
-
-// ── Floating particle ────────────────────────────────────────────────────────
+// ── Floating particle ─────────────────────────────────────────────────────────
 
 function Particle({ x, y, size, delay }: { x: number; y: number; size: number; delay: number }) {
   return (
     <motion.div
-      style={{ position: "absolute", left: `${x}%`, top: `${y}%`, width: size, height: size, borderRadius: "50%", background: "rgba(72,161,94,0.15)", pointerEvents: "none" }}
-      animate={{ y: [0, -20, 0], opacity: [0.3, 0.7, 0.3] }}
-      transition={{ duration: 4 + delay, repeat: Infinity, delay, ease: "easeInOut" }}
+      style={{ position: "absolute", left: `${x}%`, top: `${y}%`, width: size, height: size, borderRadius: "50%", background: "rgba(72,161,94,0.12)", pointerEvents: "none" }}
+      animate={{ y: [0, -18, 0], opacity: [0.25, 0.6, 0.25] }}
+      transition={{ duration: 5 + delay, repeat: Infinity, delay, ease: "easeInOut" }}
     />
   );
 }
 
-const PARTICLES = [
-  { x: 10, y: 20, size: 6, delay: 0 },
-  { x: 75, y: 10, size: 10, delay: 1 },
-  { x: 85, y: 60, size: 5, delay: 2 },
-  { x: 20, y: 75, size: 8, delay: 0.5 },
-  { x: 50, y: 85, size: 4, delay: 1.5 },
-  { x: 90, y: 30, size: 7, delay: 2.5 },
-  { x: 35, y: 15, size: 5, delay: 0.8 },
-];
+// ── Login card component ──────────────────────────────────────────────────────
 
-// ── Main component ───────────────────────────────────────────────────────────
+function LoginCard({
+  role,
+  router,
+}: {
+  role: "ngo_admin" | "volunteer";
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [inviteCode, setInviteCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-export default function LoginPage() {
+  const isNgo = role === "ngo_admin";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5 }}
+      style={{
+        background: "rgba(255,255,255,0.06)",
+        backdropFilter: "blur(24px)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 24,
+        padding: "36px 32px",
+        boxShadow: "0 32px 72px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)",
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      {/* Card header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12,
+          background: isNgo ? "linear-gradient(135deg, #2A8256, #48A15E)" : "linear-gradient(135deg, #1a7a5e, #2A8256)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {isNgo ? <Building2 size={20} color="#fff" /> : <Users size={20} color="#fff" />}
+        </div>
+        <div>
+          <h3 style={{ color: "#fff", fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: "-0.3px" }}>
+            {isNgo ? "NGO Admin Login" : "Volunteer Login"}
+          </h3>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, margin: 0 }}>
+            {isNgo ? "Manage your organisation" : "Join & contribute"}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "20px 0" }} />
+
+      {/* Login / Signup mode switcher */}
+      <div style={{ display: "flex", background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: 3, marginBottom: 22, gap: 3 }}>
+        {(["login", "signup"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => { setAuthMode(m); setError(""); }}
+            style={{
+              flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 600,
+              border: "none", cursor: "pointer", transition: "all 0.2s",
+              ...(authMode === m
+                ? { background: "rgba(255,255,255,0.12)", color: "#fff" }
+                : { background: "transparent", color: "rgba(255,255,255,0.35)" }),
+            }}
+          >
+            {m === "login" ? "Log In" : "Sign Up"}
+          </button>
+        ))}
+      </div>
+
+      {/* Invite code (volunteer only) */}
+      {!isNgo && (
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600, marginBottom: 7, letterSpacing: "0.03em", textTransform: "uppercase" }}>
+            Invite Code
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. ABC12345"
+            value={inviteCode}
+            onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); setError(""); }}
+            maxLength={16}
+            style={{
+              width: "100%", padding: "12px 15px", borderRadius: 11,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 15,
+              fontFamily: "'SF Mono', 'Fira Code', monospace", letterSpacing: "0.12em",
+              outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(72,161,94,0.5)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+          />
+          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "6px 0 0" }}>
+            Get this code from your NGO administrator.
+          </p>
+        </div>
+      )}
+
+      {/* Error */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            style={{
+              background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.25)",
+              borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+              color: "#fca5a5", fontSize: 13, textAlign: "center",
+            }}
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Divider */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+        <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500 }}>CONTINUE WITH</span>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+      </div>
+
+      {/* Google button */}
+      <motion.button
+        onClick={() => {
+          if (role === "volunteer" && !inviteCode.trim()) {
+            setError("Enter your invite code before continuing.");
+            return;
+          }
+          handleGoogleSignIn(role, inviteCode, router, setError, setBusy);
+        }}
+        disabled={busy}
+        whileHover={{ scale: busy ? 1 : 1.015, boxShadow: busy ? undefined : "0 8px 24px rgba(0,0,0,0.35)" }}
+        whileTap={{ scale: busy ? 1 : 0.975 }}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 12, padding: "14px 0", borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.15)",
+          background: busy ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.95)",
+          color: "#1a1a1a", fontSize: 15, fontWeight: 600,
+          cursor: busy ? "not-allowed" : "pointer",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", transition: "background 0.2s",
+          letterSpacing: "-0.1px", marginBottom: 10,
+        }}
+      >
+        {busy ? (
+          <div style={{ display: "flex", gap: 5 }}>
+            {[0, 1, 2].map((i) => (
+              <motion.div key={i} animate={{ y: [0, -5, 0] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                style={{ width: 6, height: 6, borderRadius: 3, background: "#6b7280" }} />
+            ))}
+          </div>
+        ) : (
+          <>
+            <GoogleIcon />
+            {authMode === "login" ? "Log In with Google" : "Sign Up with Google"}
+          </>
+        )}
+      </motion.button>
+
+      <p style={{ color: "rgba(255,255,255,0.22)", fontSize: 11.5, textAlign: "center", marginTop: 12, lineHeight: 1.6 }}>
+        {isNgo
+          ? authMode === "signup"
+            ? "First time? You'll set up your NGO profile right after sign-in."
+            : "Welcome back. Sign in to access your NGO dashboard."
+          : authMode === "signup"
+            ? "New volunteer accounts require an invite code from your NGO admin."
+            : "Enter your invite code above, then sign in with Google."}
+      </p>
+    </motion.div>
+  );
+}
+
+// ── Scroll utility ────────────────────────────────────────────────────────────
+
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function LandingPage() {
   const router = useRouter();
   const { user: fbUser, role: userRole, loading } = useAuth();
-  const [role, setRole]             = useState<"ngo_admin" | "volunteer">("ngo_admin");
-  const [authMode, setAuthMode]     = useState<"login" | "signup">("login");
-  const [inviteCode, setInviteCode] = useState("");
-  const [busy, setBusy]             = useState(false);
-  const [error, setError]           = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const loginRef = useRef<HTMLDivElement>(null);
 
-  // Redirect already-authenticated users
   useEffect(() => {
     if (loading || !fbUser) return;
     if (userRole === "NGO") router.replace("/ngo/dashboard");
     else if (userRole === "Volunteer") router.replace("/vol/dashboard");
   }, [fbUser, userRole, loading, router]);
 
-  const handleGoogle = async () => {
-    if (role === "volunteer" && !inviteCode.trim()) {
-      setError("Enter your invite code before continuing.");
-      return;
-    }
-    setError("");
-    setBusy(true);
-    try {
-      const firebaseUser = await firebaseSignIn();
-
-      // Backend bridge — seed ngo_token for portal layouts
-      try {
-        const data = await api.googleAuth({
-          email: firebaseUser.email!,
-          firebase_uid: firebaseUser.uid,
-          role,
-          invite_code: role === "volunteer" ? inviteCode.trim() || undefined : undefined,
-        });
-        localStorage.setItem("ngo_token", data.token);
-        document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
-        if (data.needs_ngo_setup) {
-          router.replace("/ngo/setup");
-        } else if (role === "ngo_admin") {
-          router.replace("/ngo/dashboard");
-        } else {
-          router.replace("/vol/dashboard");
-        }
-      } catch {
-        // Backend bridge failed — redirect based on Firebase auth
-        router.replace(role === "ngo_admin" ? "/ngo/dashboard" : "/vol/dashboard");
-      }
-    } catch (e: unknown) {
-      const code = (e as { code?: string })?.code ?? "";
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        setError("Sign-in was cancelled.");
-      } else if (code === "auth/popup-blocked") {
-        setError("Popup blocked — allow popups for this site and try again.");
-      } else if (code === "auth/unauthorized-domain") {
-        setError("This domain is not authorised in Firebase. Add it under Authentication → Settings → Authorised domains.");
-      } else {
-        setError((e as Error).message || "Sign-in failed. Please try again.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const switchRole = (newRole: "ngo_admin" | "volunteer") => {
-    setRole(newRole);
-    setError("");
-    setInviteCode("");
-  };
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   if (loading) {
     return (
@@ -181,345 +316,572 @@ export default function LoginPage() {
     );
   }
 
-  const feat = FEATURES[role];
+  // ── Page bg ──
+  const PAGE_BG = "linear-gradient(180deg, #072921 0%, #0B3D36 15%, #0d4a42 35%, #0B3D36 60%, #072921 100%)";
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "#0B3D36", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: PAGE_BG, fontFamily: "system-ui, -apple-system, sans-serif", overflowX: "hidden" }}>
 
-      {/* ── Left: Brand panel ─────────────────────────────── */}
-      <div
+      {/* ── 1. STICKY NAVBAR ─────────────────────────────────────────────────── */}
+      <nav
+        aria-label="Main navigation"
         style={{
-          flex: "0 0 52%",
-          display: "none",
-          position: "relative",
-          overflow: "hidden",
-          background: "linear-gradient(145deg, #0d4a42 0%, #0B3D36 40%, #072921 100%)",
-          borderRight: "1px solid rgba(255,255,255,0.06)",
+          position: "sticky", top: 0, zIndex: 100,
+          background: scrolled ? "rgba(7,41,33,0.92)" : "transparent",
+          backdropFilter: scrolled ? "blur(20px)" : "none",
+          borderBottom: scrolled ? "1px solid rgba(255,255,255,0.06)" : "1px solid transparent",
+          transition: "all 0.3s ease",
+          padding: "0 24px",
         }}
-        className="brand-panel"
       >
-        {/* Decorative grid */}
-        <div style={{
-          position: "absolute", inset: 0, opacity: 0.04,
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }} />
-
-        {/* Glow orbs */}
-        <div style={{ position: "absolute", top: "-10%", left: "20%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(42,130,86,0.2) 0%, transparent 70%)", filter: "blur(40px)" }} />
-        <div style={{ position: "absolute", bottom: "10%", right: "-10%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(72,161,94,0.15) 0%, transparent 70%)", filter: "blur(40px)" }} />
-
-        {/* Particles */}
-        {PARTICLES.map((p, i) => <Particle key={i} {...p} />)}
-
-        {/* Content */}
-        <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "60px 56px" }}>
-
-          {/* Logo + wordmark */}
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}
-            style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 64 }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto", display: "flex", alignItems: "center", height: 64 }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "0 0 auto", marginRight: 48 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo/logo-icon.png" alt="Sanchaalan Saathi" style={{ height: 40, width: 40, objectFit: "contain" }} />
+            <img src="/logo/logo-icon.png" alt="Sanchaalan Saathi" style={{ height: 34, width: 34, objectFit: "contain" }} />
             <div>
-              <p style={{ color: "#fff", fontWeight: 700, fontSize: 18, margin: 0, letterSpacing: "-0.3px" }}>Sanchaalan Saathi</p>
-              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: 0, fontWeight: 500 }}>NGO Coordination Platform</p>
+              <p style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0, letterSpacing: "-0.3px" }}>Sanchaalan Saathi</p>
+              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, margin: 0 }}>NGO Coordination Platform</p>
             </div>
-          </motion.div>
-
-          {/* Headline — animates on role change */}
-          <AnimatePresence mode="wait">
-            <motion.div key={role} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35 }}>
-              <h1 style={{ color: "#fff", fontSize: 38, fontWeight: 800, margin: "0 0 16px", lineHeight: 1.15, letterSpacing: "-0.8px", whiteSpace: "pre-line" }}>
-                {feat.headline}
-              </h1>
-              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 1.65, margin: "0 0 40px", maxWidth: 380 }}>
-                {feat.sub}
-              </p>
-
-              {/* Feature bullets */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 56 }}>
-                {feat.bullets.map((b, i) => (
-                  <motion.div key={b} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <CheckIcon />
-                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>{b}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Stats strip */}
-          <div style={{ display: "flex", gap: 0 }}>
-            {[feat.stat1, feat.stat2, feat.stat3].map((s, i) => (
-              <React.Fragment key={s.label}>
-                <div>
-                  <p style={{ color: "#48A15E", fontWeight: 700, fontSize: 16, margin: 0 }}>{s.value}</p>
-                  <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: "2px 0 0", fontWeight: 500 }}>{s.label}</p>
-                </div>
-                {i < 2 && <div style={{ width: 1, background: "rgba(255,255,255,0.08)", margin: "0 24px" }} />}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Right: Login panel ────────────────────────────── */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 24px",
-        background: "radial-gradient(ellipse at 60% 0%, #1a5e52 0%, #0B3D36 55%, #072921 100%)",
-        position: "relative",
-        overflow: "hidden",
-      }}>
-        {/* Ambient glow */}
-        <div style={{ position: "absolute", top: "-20%", right: "-20%", width: "60%", height: "60%", borderRadius: "50%", background: "rgba(42,130,86,0.1)", filter: "blur(80px)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "-20%", left: "-10%", width: "50%", height: "50%", borderRadius: "50%", background: "rgba(72,161,94,0.07)", filter: "blur(80px)", pointerEvents: "none" }} />
-
-        {/* Mobile logo */}
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mobile-logo"
-          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo/logo-icon.png" alt="Sanchaalan Saathi" style={{ height: 36, width: 36, objectFit: "contain" }} />
-          <div>
-            <p style={{ color: "#fff", fontWeight: 700, fontSize: 16, margin: 0 }}>Sanchaalan Saathi</p>
-            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: 0 }}>NGO Coordination Platform</p>
-          </div>
-        </motion.div>
-
-        {/* Card */}
-        <motion.div
-          initial={{ y: 24, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          style={{
-            width: "100%",
-            maxWidth: 440,
-            background: "rgba(255,255,255,0.06)",
-            backdropFilter: "blur(24px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 24,
-            padding: "36px 32px",
-            boxShadow: "0 32px 72px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {/* Card header */}
-          <div style={{ marginBottom: 24 }}>
-            <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.3px" }}>
-              {authMode === "login" ? "Welcome back" : "Get started"}
-            </h2>
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: 0 }}>
-              {authMode === "login"
-                ? `Sign in to your ${role === "ngo_admin" ? "NGO Admin" : "Volunteer"} account`
-                : `Create your ${role === "ngo_admin" ? "NGO Admin" : "Volunteer"} account`}
-            </p>
           </div>
 
-          {/* Role switcher */}
-          <div style={{ display: "flex", background: "rgba(0,0,0,0.2)", borderRadius: 12, padding: 3, marginBottom: 20, gap: 3 }}>
-            {(["ngo_admin", "volunteer"] as const).map((r) => (
-              <motion.button
-                key={r}
-                onClick={() => switchRole(r)}
-                whileTap={{ scale: 0.97 }}
-                style={{
-                  flex: 1,
-                  padding: "10px 0",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  letterSpacing: "0.01em",
-                  ...(role === r
-                    ? {
-                        background: r === "ngo_admin"
-                          ? "linear-gradient(135deg, #2A8256, #48A15E)"
-                          : "linear-gradient(135deg, #1a7a5e, #2A8256)",
-                        color: "#fff",
-                        boxShadow: "0 4px 14px rgba(42,130,86,0.4)",
-                      }
-                    : {
-                        background: "transparent",
-                        color: "rgba(255,255,255,0.45)",
-                      }),
-                }}
+          {/* Desktop nav links */}
+          <div className="nav-links" style={{ display: "flex", gap: 32, flex: 1 }}>
+            {[["Home", "top"], ["Features", "features"], ["How It Works", "how-it-works"], ["Impact", "impact"], ["Login", "login"]].map(([label, id]) => (
+              <button key={id} onClick={() => scrollTo(id)}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: 500, cursor: "pointer", padding: "4px 0", transition: "color 0.2s", fontFamily: "inherit" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.6)"; }}
               >
-                {r === "ngo_admin" ? "NGO Admin" : "Volunteer"}
-              </motion.button>
-            ))}
-          </div>
-
-          {/* Login / Signup mode switcher */}
-          <div style={{ display: "flex", background: "rgba(0,0,0,0.15)", borderRadius: 10, padding: 3, marginBottom: 22, gap: 3 }}>
-            {(["login", "signup"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => { setAuthMode(m); setError(""); }}
-                style={{
-                  flex: 1,
-                  padding: "8px 0",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  ...(authMode === m
-                    ? { background: "rgba(255,255,255,0.12)", color: "#fff" }
-                    : { background: "transparent", color: "rgba(255,255,255,0.35)" }),
-                }}
-              >
-                {m === "login" ? "Log In" : "Sign Up"}
+                {label}
               </button>
             ))}
           </div>
 
-          {/* Invite code (volunteer only) */}
-          <AnimatePresence>
-            {role === "volunteer" && (
-              <motion.div
-                key="invite"
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: "auto", marginBottom: 18 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                style={{ overflow: "hidden" }}
-              >
-                <label style={{ display: "block", color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600, marginBottom: 7, letterSpacing: "0.03em", textTransform: "uppercase" }}>
-                  Invite Code
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. ABC12345"
-                  value={inviteCode}
-                  onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); setError(""); }}
-                  maxLength={16}
-                  style={{
-                    width: "100%",
-                    padding: "12px 15px",
-                    borderRadius: 11,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.07)",
-                    color: "#fff",
-                    fontSize: 15,
-                    fontFamily: "'SF Mono', 'Fira Code', monospace",
-                    letterSpacing: "0.12em",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    transition: "border-color 0.2s",
-                  }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(72,161,94,0.5)"; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-                />
-                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "6px 0 0" }}>
-                  Get this code from your NGO administrator.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* CTA */}
+          <button
+            className="nav-cta"
+            onClick={() => scrollTo("login")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "9px 20px", borderRadius: 10,
+              background: "linear-gradient(135deg, #2A8256, #48A15E)",
+              color: "#fff", fontSize: 14, fontWeight: 600,
+              border: "none", cursor: "pointer", transition: "opacity 0.2s",
+              boxShadow: "0 4px 14px rgba(42,130,86,0.35)", fontFamily: "inherit",
+              whiteSpace: "nowrap", flexShrink: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.88"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+          >
+            Get Started <ArrowRight size={14} />
+          </button>
 
-          {/* Error */}
-          <AnimatePresence>
-            {error && (
+          {/* Hamburger */}
+          <button
+            className="hamburger"
+            aria-label="Toggle menu"
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ display: "none", background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 4, marginLeft: 12 }}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: "hidden", background: "rgba(7,41,33,0.98)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div style={{ padding: "12px 24px 20px", display: "flex", flexDirection: "column", gap: 4 }}>
+                {[["Home", "top"], ["Features", "features"], ["How It Works", "how-it-works"], ["Impact", "impact"], ["Login", "login"]].map(([label, id]) => (
+                  <button key={id}
+                    onClick={() => { scrollTo(id); setMenuOpen(false); }}
+                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 15, fontWeight: 500, cursor: "pointer", padding: "10px 0", textAlign: "left", fontFamily: "inherit", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { scrollTo("login"); setMenuOpen(false); }}
+                  style={{ marginTop: 8, padding: "12px 0", borderRadius: 10, background: "linear-gradient(135deg, #2A8256, #48A15E)", color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Get Started
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
+
+      {/* ── 2. HERO ──────────────────────────────────────────────────────────── */}
+      <section id="top" style={{ position: "relative", padding: "100px 24px 120px", overflow: "hidden" }}>
+        {/* Decorative grid */}
+        <div style={{ position: "absolute", inset: 0, opacity: 0.03, backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)", backgroundSize: "48px 48px", pointerEvents: "none" }} />
+        {/* Glow orbs */}
+        <div style={{ position: "absolute", top: "5%", left: "15%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(42,130,86,0.18) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "0%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(72,161,94,0.12) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
+
+        {[{ x: 8, y: 15, size: 7, delay: 0 }, { x: 80, y: 10, size: 10, delay: 1.2 }, { x: 92, y: 55, size: 5, delay: 2.1 }, { x: 5, y: 70, size: 8, delay: 0.7 }, { x: 55, y: 90, size: 5, delay: 1.8 }]
+          .map((p, i) => <Particle key={i} {...p} />)}
+
+        <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
+          {/* Pill badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(42,130,86,0.18)", border: "1px solid rgba(72,161,94,0.3)", borderRadius: 100, padding: "6px 16px", marginBottom: 28 }}
+          >
+            <Star size={13} color="#48A15E" fill="#48A15E" />
+            <span style={{ color: "#95C78F", fontSize: 13, fontWeight: 600 }}>AI-Powered NGO Coordination</span>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            style={{ color: "#fff", fontSize: "clamp(38px, 7vw, 68px)", fontWeight: 900, margin: "0 0 20px", lineHeight: 1.08, letterSpacing: "-2px" }}
+          >
+            Coordinate NGOs.{" "}
+            <span style={{ background: "linear-gradient(135deg, #48A15E, #95C78F)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Amplify Impact.
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            style={{ color: "rgba(255,255,255,0.55)", fontSize: "clamp(16px, 2.5vw, 20px)", lineHeight: 1.65, margin: "0 auto 44px", maxWidth: 580 }}
+          >
+            Sanchaalan Saathi brings AI-powered volunteer matching, real-time task coordination, and deep analytics to every NGO — at zero cost.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}
+          >
+            <button
+              onClick={() => scrollTo("login")}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "14px 28px", borderRadius: 12,
+                background: "linear-gradient(135deg, #2A8256, #48A15E)",
+                color: "#fff", fontSize: 16, fontWeight: 700,
+                border: "none", cursor: "pointer",
+                boxShadow: "0 8px 28px rgba(42,130,86,0.45)",
+                transition: "transform 0.2s, box-shadow 0.2s", fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(42,130,86,0.55)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(42,130,86,0.45)"; }}
+            >
+              <Users size={18} /> Join as Volunteer
+            </button>
+            <button
+              onClick={() => scrollTo("login")}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "14px 28px", borderRadius: 12,
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                color: "#fff", fontSize: 16, fontWeight: 700,
+                cursor: "pointer", transition: "background 0.2s", fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.14)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+            >
+              <Building2 size={18} /> Register as NGO
+            </button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 3. FEATURES ──────────────────────────────────────────────────────── */}
+      <section id="features" style={{ padding: "96px 24px", position: "relative" }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: "center", marginBottom: 64 }}
+          >
+            <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 12px" }}>Platform Features</p>
+            <h2 style={{ color: "#fff", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-1px" }}>Everything your NGO needs</h2>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, margin: 0, maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
+              Built for both NGO administrators and volunteers — one platform, every workflow.
+            </p>
+          </motion.div>
+
+          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            {[
+              { icon: <Zap size={22} color="#48A15E" />, title: "AI Volunteer Matching", desc: "Automatically assign the right volunteer to every task based on skills, location, and availability.", tag: "NGO Admin" },
+              { icon: <BarChart3 size={22} color="#48A15E" />, title: "Real-time Analytics", desc: "Track volunteer hours, task completion rates, and mission impact with live dashboards.", tag: "NGO Admin" },
+              { icon: <Shield size={22} color="#48A15E" />, title: "Invite-only Onboarding", desc: "Control who joins your organisation with unique invite codes — no open signups.", tag: "NGO Admin" },
+              { icon: <MapPin size={22} color="#48A15E" />, title: "Skill-based Task Feed", desc: "Volunteers see only tasks that match their skills and availability — zero noise.", tag: "Volunteer" },
+              { icon: <Bell size={22} color="#48A15E" />, title: "Instant Notifications", desc: "Get assigned to tasks the moment they're created. Never miss an opportunity to help.", tag: "Volunteer" },
+              { icon: <TrendingUp size={22} color="#48A15E" />, title: "Impact Tracking", desc: "See your personal contribution stats, hours volunteered, and tasks completed over time.", tag: "Volunteer" },
+            ].map((f, i) => (
               <motion.div
-                key="error"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                key={f.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
                 style={{
-                  background: "rgba(248,113,113,0.12)",
-                  border: "1px solid rgba(248,113,113,0.25)",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  marginBottom: 14,
-                  color: "#fca5a5",
-                  fontSize: 13,
-                  textAlign: "center",
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 18, padding: "28px 24px", transition: "border-color 0.2s, transform 0.2s",
                 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(72,161,94,0.3)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLElement).style.transform = "translateY(0)"; }}
               >
-                {error}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(72,161,94,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {f.icon}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: f.tag === "NGO Admin" ? "#48A15E" : "#95C78F", background: f.tag === "NGO Admin" ? "rgba(42,130,86,0.15)" : "rgba(149,199,143,0.12)", padding: "3px 10px", borderRadius: 100 }}>
+                    {f.tag}
+                  </span>
+                </div>
+                <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700, margin: "0 0 8px" }}>{f.title}</h3>
+                <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, margin: 0, lineHeight: 1.6 }}>{f.desc}</p>
               </motion.div>
-            )}
-          </AnimatePresence>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          {/* Divider */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
-            <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 500 }}>CONTINUE WITH</span>
-            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+      {/* ── 4. HOW IT WORKS ──────────────────────────────────────────────────── */}
+      <section id="how-it-works" style={{ padding: "96px 24px", position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.12)", pointerEvents: "none" }} />
+        <div style={{ maxWidth: 1000, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: "center", marginBottom: 72 }}
+          >
+            <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 12px" }}>How It Works</p>
+            <h2 style={{ color: "#fff", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-1px" }}>Up and running in minutes</h2>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, margin: 0 }}>Three simple steps to transform how your NGO operates.</p>
+          </motion.div>
+
+          <div className="steps-row" style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+            {[
+              { num: "01", icon: <CheckCircle2 size={28} color="#48A15E" />, title: "Create or Join", desc: "NGOs register and set up their organisation. Volunteers join with an invite code from their NGO admin." },
+              { num: "02", icon: <Zap size={28} color="#48A15E" />, title: "AI Assigns Tasks", desc: "Our matching engine analyses skills, location, and availability to assign the best volunteer to every task instantly." },
+              { num: "03", icon: <TrendingUp size={28} color="#48A15E" />, title: "Track Your Impact", desc: "Both NGO admins and volunteers get real-time dashboards showing progress, hours, and mission outcomes." },
+            ].map((step, i) => (
+              <React.Fragment key={step.num}>
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.15 }}
+                  style={{ flex: 1, textAlign: "center", padding: "40px 32px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20 }}
+                >
+                  <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 60, height: 60, borderRadius: "50%", background: "rgba(42,130,86,0.15)", marginBottom: 20 }}>
+                    {step.icon}
+                  </div>
+                  <p style={{ color: "#48A15E", fontSize: 12, fontWeight: 800, letterSpacing: "0.1em", margin: "0 0 10px" }}>{step.num}</p>
+                  <h3 style={{ color: "#fff", fontSize: 20, fontWeight: 700, margin: "0 0 12px" }}>{step.title}</h3>
+                  <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, lineHeight: 1.65, margin: 0 }}>{step.desc}</p>
+                </motion.div>
+                {i < 2 && (
+                  <div className="step-arrow" style={{ display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }}>
+                    <ChevronRight size={24} color="rgba(255,255,255,0.2)" />
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 5. IMPACT ────────────────────────────────────────────────────────── */}
+      <section id="impact" style={{ padding: "96px 24px" }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: "center", marginBottom: 64 }}
+          >
+            <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 12px" }}>Real-World Impact</p>
+            <h2 style={{ color: "#fff", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-1px" }}>Built to scale with your mission</h2>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, margin: 0, maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
+              From local community groups to large-scale relief operations — Sanchaalan Saathi handles it all.
+            </p>
+          </motion.div>
+
+          <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 60 }}>
+            {[
+              { value: "1,000+", label: "Volunteers Ready", icon: <Users size={20} color="#48A15E" /> },
+              { value: "Zero Cost", label: "To Get Started", icon: <Star size={20} color="#48A15E" /> },
+              { value: "Real-time", label: "Task Updates", icon: <Clock size={20} color="#48A15E" /> },
+              { value: "AI-First", label: "Matching Engine", icon: <Zap size={20} color="#48A15E" /> },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                style={{ background: "rgba(42,130,86,0.1)", border: "1px solid rgba(72,161,94,0.2)", borderRadius: 18, padding: "28px 20px", textAlign: "center" }}
+              >
+                <div style={{ display: "inline-flex", width: 44, height: 44, borderRadius: 12, background: "rgba(72,161,94,0.15)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+                  {stat.icon}
+                </div>
+                <p style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: "0 0 4px", letterSpacing: "-0.5px" }}>{stat.value}</p>
+                <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, margin: 0, fontWeight: 500 }}>{stat.label}</p>
+              </motion.div>
+            ))}
           </div>
 
-          {/* Primary: Google button */}
-          <motion.button
-            onClick={handleGoogle}
-            disabled={busy}
-            whileHover={{ scale: busy ? 1 : 1.015, boxShadow: busy ? undefined : "0 8px 24px rgba(0,0,0,0.35)" }}
-            whileTap={{ scale: busy ? 1 : 0.975 }}
+          {/* Impact statement */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "40px 48px", display: "flex", gap: 40, alignItems: "center" }}
+            className="impact-statement"
+          >
+            <div style={{ flex: 1 }}>
+              <h3 style={{ color: "#fff", fontSize: 24, fontWeight: 800, margin: "0 0 12px", letterSpacing: "-0.5px" }}>Why it matters</h3>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, lineHeight: 1.75, margin: 0 }}>
+                Traditional NGO coordination relies on WhatsApp groups, spreadsheets, and manual calls. Sanchaalan Saathi replaces all of it with a single, intelligent platform — so your team spends less time on logistics and more time on the mission that matters.
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, flexShrink: 0 }}>
+              {["Eliminate coordination bottlenecks", "Match skills to tasks automatically", "Measure real-world outcomes"].map((pt) => (
+                <div key={pt} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <CheckCircle2 size={16} color="#48A15E" />
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>{pt}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 6. DIFFERENTIATION ───────────────────────────────────────────────── */}
+      <section style={{ padding: "96px 24px", position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.1)", pointerEvents: "none" }} />
+        <div style={{ maxWidth: 1120, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: "center", marginBottom: 64 }}
+          >
+            <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 12px" }}>Why Sanchaalan Saathi</p>
+            <h2 style={{ color: "#fff", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-1px" }}>Not just another tool</h2>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, margin: 0, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
+              We built specifically for the NGO sector — not adapted from a generic SaaS template.
+            </p>
+          </motion.div>
+
+          <div className="diff-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+            {/* Left: others */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "36px 32px" }}
+            >
+              <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 24px" }}>Generic Tools</p>
+              {["Manual volunteer assignment via spreadsheets", "No real-time coordination", "Paid plans with per-seat pricing", "No NGO-specific workflows", "No impact measurement"].map((item) => (
+                <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+                  <X size={15} color="rgba(248,113,113,0.7)" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 14, lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+            </motion.div>
+
+            {/* Right: Sanchaalan Saathi */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              style={{ background: "rgba(42,130,86,0.08)", border: "1px solid rgba(72,161,94,0.25)", borderRadius: 20, padding: "36px 32px" }}
+            >
+              <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 24px" }}>Sanchaalan Saathi</p>
+              {["AI-powered matching — right person, right task", "Live dashboards with real-time updates", "Completely free — built for social impact", "Purpose-built for NGO multi-tenancy", "Measurable outcomes with analytics"].map((item) => (
+                <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+                  <CheckCircle2 size={15} color="#48A15E" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, lineHeight: 1.5 }}>{item}</span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 7. LOGIN SECTION ─────────────────────────────────────────────────── */}
+      <section id="login" ref={loginRef} style={{ padding: "96px 24px 112px", position: "relative" }}>
+        <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(42,130,86,0.12) 0%, transparent 70%)", filter: "blur(80px)", pointerEvents: "none" }} />
+        <div style={{ maxWidth: 960, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: "center", marginBottom: 56 }}
+          >
+            <p style={{ color: "#48A15E", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 12px" }}>Get Started</p>
+            <h2 style={{ color: "#fff", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-1px" }}>Choose your role and sign in</h2>
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, margin: 0 }}>
+              One platform — two portals. Each built for the way you work.
+            </p>
+          </motion.div>
+
+          <div className="login-cols" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
+            <LoginCard role="ngo_admin" router={router} />
+            {/* Divider */}
+            <div className="login-divider" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, flexShrink: 0, padding: "0 8px" }}>
+              <div style={{ flex: 1, width: 1, background: "rgba(255,255,255,0.06)" }} />
+              <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, fontWeight: 600, letterSpacing: "0.05em" }}>OR</span>
+              <div style={{ flex: 1, width: 1, background: "rgba(255,255,255,0.06)" }} />
+            </div>
+            <LoginCard role="volunteer" router={router} />
+          </div>
+        </div>
+      </section>
+
+      {/* ── 8. PRE-FOOTER CTA ────────────────────────────────────────────────── */}
+      <section style={{ padding: "80px 24px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 12,
-              padding: "14px 0",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: busy ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.95)",
-              color: "#1a1a1a",
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: busy ? "not-allowed" : "pointer",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-              transition: "background 0.2s",
-              letterSpacing: "-0.1px",
-              marginBottom: 10,
+              textAlign: "center", background: "rgba(42,130,86,0.1)",
+              border: "1px solid rgba(72,161,94,0.2)", borderRadius: 24, padding: "60px 48px",
             }}
           >
-            {busy ? (
-              <div style={{ display: "flex", gap: 5 }}>
-                {[0, 1, 2].map((i) => (
-                  <motion.div key={i} animate={{ y: [0, -5, 0] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                    style={{ width: 6, height: 6, borderRadius: 3, background: "#6b7280" }} />
+            <Globe size={40} color="#48A15E" style={{ marginBottom: 20 }} />
+            <h2 style={{ color: "#fff", fontSize: "clamp(24px, 3.5vw, 38px)", fontWeight: 800, margin: "0 0 16px", letterSpacing: "-0.8px" }}>
+              Be part of the change
+            </h2>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 17, lineHeight: 1.7, margin: "0 0 36px", maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+              Join thousands of NGOs and volunteers already using Sanchaalan Saathi to coordinate relief, build communities, and measure impact.
+            </p>
+            <button
+              onClick={() => scrollTo("login")}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "14px 32px", borderRadius: 12,
+                background: "linear-gradient(135deg, #2A8256, #48A15E)",
+                color: "#fff", fontSize: 16, fontWeight: 700,
+                border: "none", cursor: "pointer",
+                boxShadow: "0 8px 28px rgba(42,130,86,0.4)",
+                transition: "transform 0.2s, box-shadow 0.2s", fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
+            >
+              Get Started for Free <ArrowRight size={16} />
+            </button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 9. FOOTER ────────────────────────────────────────────────────────── */}
+      <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "56px 24px 32px" }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+          <div className="footer-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
+            {/* Brand */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo/logo-icon.png" alt="Sanchaalan Saathi" style={{ height: 32, width: 32, objectFit: "contain" }} />
+                <p style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0 }}>Sanchaalan Saathi</p>
+              </div>
+              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 14, lineHeight: 1.65, margin: "0 0 20px", maxWidth: 260 }}>
+                AI-powered NGO coordination platform — helping organisations and volunteers work smarter together.
+              </p>
+              <div style={{ display: "flex", gap: 12 }}>
+                {["Twitter", "LinkedIn", "GitHub"].map((s) => (
+                  <div key={s} style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    <Globe size={14} color="rgba(255,255,255,0.45)" />
+                  </div>
                 ))}
               </div>
-            ) : (
-              <>
-                <GoogleIcon />
-                {authMode === "login" ? "Log In with Google" : "Sign Up with Google"}
-              </>
-            )}
-          </motion.button>
+            </div>
 
-          {/* Footer note */}
-          <p style={{ color: "rgba(255,255,255,0.22)", fontSize: 11.5, textAlign: "center", marginTop: 16, lineHeight: 1.6 }}>
-            {role === "volunteer"
-              ? authMode === "signup"
-                ? "New volunteer accounts require an invite code from your NGO admin."
-                : "Enter your invite code above, then sign in with Google."
-              : authMode === "signup"
-                ? "First time? You'll set up your NGO profile right after sign-in."
-                : "Welcome back. Sign in to access your NGO dashboard."}
-          </p>
-        </motion.div>
+            {/* Platform */}
+            <div>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 16px" }}>Platform</p>
+              {["Features", "How It Works", "Impact", "Get Started"].map((l) => (
+                <p key={l} style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: "0 0 10px", cursor: "pointer" }}
+                  onClick={() => scrollTo(l === "Get Started" ? "login" : l.toLowerCase().replace(/ /g, "-"))}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+                >{l}</p>
+              ))}
+            </div>
 
-        {/* Footer */}
-        <p style={{ color: "rgba(255,255,255,0.18)", fontSize: 11, marginTop: 28, position: "relative", zIndex: 1 }}>
-          © 2025 Sanchaalan Saathi — Built for NGOs
-        </p>
-      </div>
+            {/* For */}
+            <div>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 16px" }}>For</p>
+              {["NGO Admins", "Volunteers", "Community Groups", "Relief Organisations"].map((l) => (
+                <p key={l} style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: "0 0 10px" }}>{l}</p>
+              ))}
+            </div>
 
-      {/* Responsive styles */}
+            {/* Contact */}
+            <div>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 16px" }}>Contact</p>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: "0 0 10px" }}>hello@sanchaalan.org</p>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: "0 0 10px" }}>India</p>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: 0 }}>support@sanchaalan.org</p>
+            </div>
+          </div>
+
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <p style={{ color: "rgba(255,255,255,0.2)", fontSize: 13, margin: 0 }}>
+              © 2025 Sanchaalan Saathi. Built for NGOs. All rights reserved.
+            </p>
+            <div style={{ display: "flex", gap: 24 }}>
+              {["Privacy Policy", "Terms of Service"].map((l) => (
+                <p key={l} style={{ color: "rgba(255,255,255,0.25)", fontSize: 13, margin: 0, cursor: "pointer" }}>{l}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── Responsive styles ──────────────────────────────────────────────── */}
       <style>{`
-        @media (min-width: 900px) {
-          .brand-panel { display: flex !important; }
-          .mobile-logo { display: none !important; }
+        @media (min-width: 768px) {
+          .nav-links { display: flex !important; }
+          .nav-cta { display: flex !important; }
+          .hamburger { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          .nav-links { display: none !important; }
+          .nav-cta { display: none !important; }
+          .hamburger { display: block !important; }
+          .features-grid { grid-template-columns: 1fr !important; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .login-cols { flex-direction: column !important; }
+          .login-divider { flex-direction: row !important; padding: 8px 0 !important; }
+          .login-divider > div { flex: unset !important; width: auto !important; flex: 1 !important; height: 1px !important; }
+          .steps-row { flex-direction: column !important; }
+          .step-arrow { transform: rotate(90deg); }
+          .footer-grid { grid-template-columns: 1fr 1fr !important; }
+          .diff-grid { grid-template-columns: 1fr !important; }
+          .impact-statement { flex-direction: column !important; padding: 32px 24px !important; }
+        }
+        @media (max-width: 480px) {
+          .stats-grid { grid-template-columns: 1fr !important; }
+          .footer-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
