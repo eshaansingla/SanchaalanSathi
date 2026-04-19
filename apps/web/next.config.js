@@ -28,7 +28,7 @@ const nextConfig = {
       { key: 'X-Content-Type-Options', value: 'nosniff' },
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
-      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
       { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
     ];
 
@@ -63,7 +63,7 @@ const nextConfig = {
             "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://firebasestorage.googleapis.com https://lh3.googleusercontent.com",
             "font-src 'self' https://fonts.gstatic.com",
             `connect-src ${connectSrc.join(' ')} https://accounts.google.com`,
-            "frame-src 'self' https://accounts.google.com",
+            "frame-src 'self' https://accounts.google.com https://synapseai-38e29.firebaseapp.com",
             "frame-ancestors 'none'",
             "object-src 'none'",
             "base-uri 'self'",

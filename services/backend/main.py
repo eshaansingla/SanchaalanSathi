@@ -44,16 +44,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-_FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+_FRONTEND_URL = os.getenv("FRONTEND_URL", "")
+_extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        _FRONTEND_URL,
+        *([_FRONTEND_URL] if _FRONTEND_URL else []),
+        *_extra_origins,
     ],
-    # Covers Vercel preview deployments and Railway apps without wildcarding all origins
-    allow_origin_regex=r"https://[a-z0-9\-]+(\.vercel\.app|\.railway\.app)",
+    allow_origin_regex=r"https?://.*",
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,

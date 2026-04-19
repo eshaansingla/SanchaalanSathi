@@ -25,9 +25,15 @@ async function exchangeAndRedirect(
   setBusy: (b: boolean) => void,
   setStep: (s: string) => void,
 ): Promise<void> {
-  setStep("Setting up your account…");
+  // Warn early if backend URL was not configured — request will fail.
+  if (BACKEND.includes("localhost") && typeof window !== "undefined" && location.protocol === "https:") {
+    console.error("[auth] NEXT_PUBLIC_BACKEND_URL is not set — falling back to localhost:8000 which will fail on a deployed frontend.");
+  }
+
+  setStep("Connecting to server…");
+  // 60 s timeout — accounts for Render free-tier cold start (can take 30-50 s).
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20_000);
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
   try {
     const res = await fetch(`${BACKEND}/api/auth/google`, {
       method: "POST",
@@ -42,8 +48,10 @@ async function exchangeAndRedirect(
     });
     clearTimeout(timeoutId);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Server error (${res.status})`);
+      const body = await res.json().catch(() => ({}));
+      const detail = body.detail || `Server error ${res.status}`;
+      console.error("[auth] Backend /api/auth/google failed:", res.status, body);
+      throw new Error(detail);
     }
     const data: { token: string; role: string; ngo_id: string | null; needs_ngo_setup?: boolean } = await res.json();
     localStorage.setItem("ngo_token", data.token);
@@ -55,10 +63,11 @@ async function exchangeAndRedirect(
   } catch (e: unknown) {
     clearTimeout(timeoutId);
     const err = e as Error;
+    console.error("[auth] exchangeAndRedirect error:", err);
     if (err.name === "AbortError") {
-      setError("Server took too long to respond (>20 s). Check your connection and try again.");
-    } else if (err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")) {
-      setError("Cannot reach the server. Check your internet connection and try again.");
+      setError(`Server is taking too long to respond (backend: ${BACKEND}). It may be starting up — wait 30 s and try again.`);
+    } else if (err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError") || err.message?.includes("fetch")) {
+      setError(`Cannot reach backend (${BACKEND}). Check NEXT_PUBLIC_BACKEND_URL env var on your frontend deployment.`);
     } else if (err.message?.includes("invite_code") || err.message?.includes("Invalid invite code")) {
       setError("Invalid or expired invite code. Ask your NGO admin for a new one.");
     } else {
