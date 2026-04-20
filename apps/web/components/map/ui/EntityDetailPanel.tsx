@@ -3,6 +3,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { X, User, Zap, Package } from "lucide-react";
+import { useTheme } from "../../ui/ThemeProvider";
 import { SelectionType } from "../hooks/useMapController";
 import { VolunteerPin, OperationPin, ResourcePin } from "../data/types";
 
@@ -22,7 +23,19 @@ const STATUS_BADGE: Record<string, string> = {
   equipment: "bg-blue-50 text-blue-700",
 };
 
-function VolunteerPanel({ data }: { data: VolunteerPin }) {
+const STATUS_BADGE_DARK: Record<string, { bg: string; color: string }> = {
+  available: { bg: "rgba(42,130,86,0.18)", color: "#95C78F" },
+  busy: { bg: "rgba(217,119,6,0.18)", color: "#F59E0B" },
+  critical: { bg: "rgba(239,68,68,0.18)", color: "#F87171" },
+  active: { bg: "rgba(72,161,94,0.18)", color: "#48A15E" },
+  completed: { bg: "rgba(148,163,184,0.16)", color: "#CBD5E1" },
+  medical: { bg: "rgba(239,68,68,0.18)", color: "#F87171" },
+  food: { bg: "rgba(245,158,11,0.18)", color: "#F59E0B" },
+  equipment: { bg: "rgba(59,130,246,0.18)", color: "#60A5FA" },
+};
+
+function VolunteerPanel({ data, isDark }: { data: VolunteerPin; isDark: boolean }) {
+  const badge = isDark ? STATUS_BADGE_DARK[data.status] : null;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -33,19 +46,28 @@ function VolunteerPanel({ data }: { data: VolunteerPin }) {
           {data.initials}
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-800">{data.name}</p>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[data.status]}`}>
+          <p className="text-sm font-bold" style={{ color: isDark ? "#F5F6F1" : "#1f2937" }}>{data.name}</p>
+          <span
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={isDark ? { background: badge?.bg, color: badge?.color } : undefined}
+          >
             {data.status}
           </span>
         </div>
       </div>
       {data.skills.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Skills</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>Skills</p>
           <div className="flex flex-wrap gap-1">
             {data.skills.map((s) => (
-              <span key={s} className="text-[10px] px-2 py-0.5 rounded-full border border-[#2A8256]/20 text-[#2A8256]"
-                style={{ background: "rgba(42,130,86,0.08)" }}>
+              <span
+                key={s}
+                className="text-[10px] px-2 py-0.5 rounded-full border"
+                style={{
+                  background: isDark ? "rgba(42,130,86,0.12)" : "rgba(42,130,86,0.08)",
+                  borderColor: isDark ? "rgba(72,161,94,0.35)" : "rgba(42,130,86,0.2)",
+                  color: isDark ? "#95C78F" : "#2A8256",
+                }}>
                 {s}
               </span>
             ))}
@@ -53,22 +75,28 @@ function VolunteerPanel({ data }: { data: VolunteerPin }) {
         </div>
       )}
       {data.email && (
-        <p className="text-[10px] text-gray-400">{data.email}</p>
+        <p className="text-[10px]" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>{data.email}</p>
       )}
       {data.performanceScore !== undefined && (
-        <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 space-y-1.5">
-          <div className="flex justify-between text-[10px] text-gray-400">
+        <div
+          className="rounded-xl px-3 py-2.5 border space-y-1.5"
+          style={{
+            background: isDark ? "#1A352F" : "#F9FAFB",
+            borderColor: isDark ? "#23473E" : "#E5E7EB",
+          }}
+        >
+          <div className="flex justify-between text-[10px]" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>
             <span>Performance</span>
             <span className="font-bold" style={{ color: "#2A8256" }}>{data.performanceScore.toFixed(0)}%</span>
           </div>
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: isDark ? "rgba(42,130,86,0.2)" : "#E5E7EB" }}>
             <div className="h-full rounded-full" style={{ width: `${data.performanceScore}%`, background: "linear-gradient(90deg,#2A8256,#48A15E)" }} />
           </div>
-          <p className="text-[10px] text-gray-400">{data.completedTasks ?? 0} tasks completed</p>
+          <p className="text-[10px]" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>{data.completedTasks ?? 0} tasks completed</p>
         </div>
       )}
       {data.assignedTo && (
-        <p className="text-[10px] text-amber-600 flex items-center gap-1">
+        <p className="text-[10px] flex items-center gap-1" style={{ color: isDark ? "#F59E0B" : "#D97706" }}>
           <Zap size={10} /> Currently deployed to an operation
         </p>
       )}
@@ -82,25 +110,29 @@ function VolunteerPanel({ data }: { data: VolunteerPin }) {
   );
 }
 
-function OperationPanel({ data }: { data: OperationPin }) {
+function OperationPanel({ data, isDark }: { data: OperationPin; isDark: boolean }) {
   const pct = data.needed > 0 ? Math.min((data.assigned / data.needed) * 100, 100) : 100;
+  const badge = isDark ? STATUS_BADGE_DARK[data.status] : null;
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm font-bold text-gray-800 leading-tight">{data.title}</p>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1 inline-block ${STATUS_BADGE[data.status]}`}>
+        <p className="text-sm font-bold leading-tight" style={{ color: isDark ? "#F5F6F1" : "#1f2937" }}>{data.title}</p>
+        <span
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
+          style={isDark ? { background: badge?.bg, color: badge?.color } : undefined}
+        >
           {data.status}
         </span>
       </div>
       {data.description && (
-        <p className="text-xs text-gray-500 leading-relaxed">{data.description}</p>
+        <p className="text-xs leading-relaxed" style={{ color: isDark ? "#A4B4B1" : "#6b7280" }}>{data.description}</p>
       )}
       <div>
-        <div className="flex justify-between text-[10px] text-gray-400 mb-1.5">
+        <div className="flex justify-between text-[10px] mb-1.5" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>
           <span>Volunteers assigned</span>
-          <span className="font-semibold text-gray-700">{data.assigned}/{data.needed}</span>
+          <span className="font-semibold" style={{ color: isDark ? "#F5F6F1" : "#374151" }}>{data.assigned}/{data.needed}</span>
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: isDark ? "rgba(42,130,86,0.2)" : "#E5E7EB" }}>
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -122,26 +154,27 @@ function OperationPanel({ data }: { data: OperationPin }) {
   );
 }
 
-function ResourcePanel({ data }: { data: ResourcePin }) {
+function ResourcePanel({ data, isDark }: { data: ResourcePin; isDark: boolean }) {
   const icons: Record<string, string> = { medical: "💊", food: "🍱", equipment: "🔧" };
+  const badge = isDark ? STATUS_BADGE_DARK[data.type] : null;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 border border-[#2A8256]/20"
-          style={{ background: "rgba(42,130,86,0.08)" }}
+          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 border"
+          style={{ background: isDark ? "rgba(42,130,86,0.12)" : "rgba(42,130,86,0.08)", borderColor: isDark ? "rgba(72,161,94,0.35)" : "rgba(42,130,86,0.2)" }}
         >
           {icons[data.type] ?? "📦"}
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-800 leading-tight">{data.title}</p>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 inline-block ${STATUS_BADGE[data.type]}`}>
+          <p className="text-sm font-bold leading-tight" style={{ color: isDark ? "#F5F6F1" : "#1f2937" }}>{data.title}</p>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-0.5 inline-block" style={isDark ? { background: badge?.bg, color: badge?.color } : undefined}>
             {data.type}
           </span>
         </div>
       </div>
-      <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between border border-gray-100">
-        <p className="text-xs text-gray-500">Stock available</p>
+      <div className="rounded-xl px-4 py-3 flex items-center justify-between border" style={{ background: isDark ? "#1A352F" : "#F9FAFB", borderColor: isDark ? "#23473E" : "#E5E7EB" }}>
+        <p className="text-xs" style={{ color: isDark ? "#A4B4B1" : "#6b7280" }}>Stock available</p>
         <p className="text-lg font-bold" style={{ color: data.stock > 100 ? "#2A8256" : "#d97706" }}>
           {data.stock}
         </p>
@@ -157,6 +190,9 @@ function ResourcePanel({ data }: { data: ResourcePin }) {
 }
 
 export default function EntityDetailPanel({ entity, onClose }: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   if (!entity) return null;
 
   return (
@@ -167,27 +203,28 @@ export default function EntityDetailPanel({ entity, onClose }: Props) {
       transition={{ type: "spring", stiffness: 340, damping: 28 }}
       className="absolute right-4 top-16 w-72 rounded-2xl p-5 z-20"
       style={{
-        background: "#F5F6F1",
-        boxShadow:  "0 24px 60px rgba(0,0,0,0.22)",
-        border:     "1px solid rgba(0,0,0,0.06)",
+        background: isDark ? "#122622" : "#F5F6F1",
+        boxShadow:  isDark ? "0 24px 60px rgba(0,0,0,0.4)" : "0 24px 60px rgba(0,0,0,0.22)",
+        border:     isDark ? "1px solid #23473E" : "1px solid rgba(0,0,0,0.06)",
       }}
     >
       <button
         onClick={onClose}
-        className="absolute top-3.5 right-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+        className="absolute top-3.5 right-3.5 transition-colors"
+        style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}
       >
         <X size={15} />
       </button>
 
-      <div className="mb-4 flex items-center gap-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-semibold">
+      <div className="mb-4 flex items-center gap-1.5 text-[10px] uppercase tracking-wide font-semibold" style={{ color: isDark ? "#A4B4B1" : "#9ca3af" }}>
         {entity.type === "volunteer" && <><User size={10} /> Volunteer</>}
         {entity.type === "operation" && <><Zap size={10} className="text-red-500" /> Operation</>}
         {entity.type === "resource"  && <><Package size={10} className="text-[#2A8256]" /> Resource</>}
       </div>
 
-      {entity.type === "volunteer" && <VolunteerPanel data={entity.data as VolunteerPin} />}
-      {entity.type === "operation" && <OperationPanel data={entity.data as OperationPin} />}
-      {entity.type === "resource"  && <ResourcePanel  data={entity.data as ResourcePin}  />}
+      {entity.type === "volunteer" && <VolunteerPanel data={entity.data as VolunteerPin} isDark={isDark} />}
+      {entity.type === "operation" && <OperationPanel data={entity.data as OperationPin} isDark={isDark} />}
+      {entity.type === "resource"  && <ResourcePanel  data={entity.data as ResourcePin}  isDark={isDark} />}
     </motion.div>
   );
 }

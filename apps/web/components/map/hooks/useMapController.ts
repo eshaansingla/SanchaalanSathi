@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
-import { MAP_OPTIONS } from "../mapStyles";
+import { getMapOptions, type MapTheme } from "../mapStyles";
+import { useTheme } from "../../ui/ThemeProvider";
 
 export type FilterType = "all" | "volunteers" | "resources" | "operations";
 export type SelectionType = { type: "volunteer" | "operation" | "resource"; data: any } | null;
@@ -13,6 +14,7 @@ export function useMapController() {
   const [mapReady, setMapReady] = useState(false);
   const [selected, setSelected] = useState<SelectionType>(null);
   const [filter, setFilter]     = useState<FilterType>("all");
+  const { theme } = useTheme();
 
   const initMap = useCallback(async (container: HTMLElement) => {
     if (mapRef.current) return;
@@ -21,10 +23,15 @@ export function useMapController() {
       version: "weekly",
     });
     await loader.load();
-    const map = new google.maps.Map(container, MAP_OPTIONS);
+    const map = new google.maps.Map(container, getMapOptions(theme as MapTheme));
     mapRef.current = map;
     setMapReady(true);
-  }, []);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    mapRef.current.setOptions(getMapOptions(theme as MapTheme));
+  }, [theme, mapReady]);
 
   const panTo = useCallback((lat: number, lng: number) => {
     mapRef.current?.panTo({ lat, lng });

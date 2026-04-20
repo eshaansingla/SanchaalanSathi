@@ -1,6 +1,6 @@
 export const INDIA_BOUNDS = { north: 37.6, south: 6.5, west: 68.1, east: 97.4 };
 
-export const MAP_STYLES: google.maps.MapTypeStyle[] = [
+export const MAP_STYLES_LIGHT: google.maps.MapTypeStyle[] = [
   { elementType: "geometry",             stylers: [{ color: "#F0EEE8" }] },
   { elementType: "labels.text.stroke",   stylers: [{ color: "#F0EEE8" }] },
   { elementType: "labels.text.fill",     stylers: [{ color: "#8a8a7a" }] },
@@ -20,13 +20,45 @@ export const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "landscape.man_made",  elementType: "geometry", stylers: [{ color: "#EEECEA" }] },
 ];
 
-export const MAP_OPTIONS: google.maps.MapOptions = {
+export const MAP_STYLES_DARK: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry",             stylers: [{ color: "#122622" }] },
+  { elementType: "labels.text.stroke",   stylers: [{ color: "#122622" }] },
+  { elementType: "labels.text.fill",     stylers: [{ color: "#A4B4B1" }] },
+  { featureType: "water", elementType: "geometry",         stylers: [{ color: "#0A1412" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#A4B4B1" }] },
+  { featureType: "road",         elementType: "geometry",        stylers: [{ color: "#1A352F" }] },
+  { featureType: "road",         elementType: "geometry.stroke",  stylers: [{ color: "#23473E" }] },
+  { featureType: "road.highway", elementType: "geometry",        stylers: [{ color: "#1A352F" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke",  stylers: [{ color: "#23473E" }] },
+  { featureType: "road",         elementType: "labels.text.fill", stylers: [{ color: "#A4B4B1" }] },
+  { featureType: "poi",     stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative.country",  elementType: "geometry.stroke", stylers: [{ color: "#23473E" }, { weight: 1.2 }] },
+  { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#23473E" }, { weight: 0.8 }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#A4B4B1" }] },
+  { featureType: "landscape.natural",   elementType: "geometry", stylers: [{ color: "#122622" }] },
+  { featureType: "landscape.man_made",  elementType: "geometry", stylers: [{ color: "#122622" }] },
+];
+
+export type MapTheme = "light" | "dark";
+
+export const MAP_STYLES = MAP_STYLES_LIGHT;
+
+const BASE_MAP_OPTIONS: Omit<google.maps.MapOptions, "styles"> = {
   center: { lat: 22.5937, lng: 78.9629 },
   zoom: 5,
   minZoom: 4,
   maxZoom: 16,
   restriction: { latLngBounds: INDIA_BOUNDS, strictBounds: false },
   disableDefaultUI: true,
-  styles: MAP_STYLES,
+  mapTypeControl: false,
+  streetViewControl: false,
   gestureHandling: "greedy",
 };
+
+export function getMapOptions(theme: MapTheme): google.maps.MapOptions {
+  return {
+    ...BASE_MAP_OPTIONS,
+    styles: theme === "dark" ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
+  };
+}

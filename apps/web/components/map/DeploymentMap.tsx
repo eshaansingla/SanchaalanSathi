@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence } from "motion/react";
 import { useMapController } from "./hooks/useMapController";
+import { useTheme } from "../ui/ThemeProvider";
 import CustomHtmlMarker from "./markers/CustomHtmlMarker";
 import FilterBar from "./ui/FilterBar";
 import EntityDetailPanel from "./ui/EntityDetailPanel";
@@ -42,6 +43,12 @@ const MAP_CSS = `
   opacity:0; transition:opacity 0.15s; border:1px solid rgba(255,255,255,0.12);
   box-shadow:0 4px 12px rgba(0,0,0,0.2);
 }
+.map-theme-dark .map-tooltip {
+  background:rgba(18,38,34,0.96);
+  color:#F5F6F1;
+  border-color:rgba(35,71,62,0.85);
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+}
 .vol-marker:hover .map-tooltip,
 .res-marker:hover .map-tooltip,
 .op-marker:hover  .map-tooltip  { opacity:1; }
@@ -61,13 +68,16 @@ const MAP_CSS = `
   animation:cluster-pulse 2s ease-out infinite;
   pointer-events:none;
 }
+.map-theme-dark .cluster-marker::before {
+  background:rgba(149,199,143,0.25);
+}
 `;
 
 // ── Volunteer marker ──────────────────────────────────────────────────────────
-function VolMarker({ data, selected, onClick }: {
-  data: VolunteerPin; selected: boolean; onClick: () => void;
+function VolMarker({ data, selected, onClick, isDark }: {
+  data: VolunteerPin; selected: boolean; onClick: () => void; isDark: boolean;
 }) {
-  const borderColor = selected ? "#115E54" : data.status === "available" ? "#95C78F" : "#d97706";
+  const borderColor = selected ? (isDark ? "#48A15E" : "#115E54") : data.status === "available" ? "#95C78F" : "#d97706";
   const bg = selected
     ? "linear-gradient(135deg,#115E54,#2A8256)"
     : data.status === "available"
@@ -83,7 +93,13 @@ function VolMarker({ data, selected, onClick }: {
           border: `3px solid ${borderColor}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "#fff", fontSize: 12, fontWeight: 700,
-          boxShadow: selected ? `0 0 0 3px rgba(17,94,84,0.4)` : "0 4px 12px rgba(0,0,0,0.2)",
+          boxShadow: selected
+            ? isDark
+              ? "0 0 0 3px rgba(149,199,143,0.3), 0 8px 24px rgba(0,0,0,0.45)"
+              : "0 0 0 3px rgba(17,94,84,0.4)"
+            : isDark
+              ? "0 4px 12px rgba(0,0,0,0.45)"
+              : "0 4px 12px rgba(0,0,0,0.2)",
         }}
       >
         {data.initials}
@@ -96,8 +112,8 @@ function VolMarker({ data, selected, onClick }: {
 // ── Resource marker ───────────────────────────────────────────────────────────
 const RES_ICONS: Record<string, string> = { medical: "💊", food: "🍱", equipment: "🔧" };
 
-function ResMarker({ data, selected, onClick }: {
-  data: ResourcePin; selected: boolean; onClick: () => void;
+function ResMarker({ data, selected, onClick, isDark }: {
+  data: ResourcePin; selected: boolean; onClick: () => void; isDark: boolean;
 }) {
   return (
     <div className="res-marker" onClick={onClick} style={{ cursor: "pointer" }}>
@@ -105,11 +121,17 @@ function ResMarker({ data, selected, onClick }: {
         className="res-inner"
         style={{
           width: 30, height: 30,
-          background: selected ? "#115E54" : "#2A8256",
+          background: selected ? (isDark ? "#48A15E" : "#115E54") : "#2A8256",
           transform: "rotate(45deg)",
           borderRadius: 6,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: selected ? "0 0 0 3px rgba(17,94,84,0.4)" : "0 4px 12px rgba(0,0,0,0.2)",
+          boxShadow: selected
+            ? isDark
+              ? "0 0 0 3px rgba(149,199,143,0.3), 0 8px 24px rgba(0,0,0,0.45)"
+              : "0 0 0 3px rgba(17,94,84,0.4)"
+            : isDark
+              ? "0 4px 12px rgba(0,0,0,0.45)"
+              : "0 4px 12px rgba(0,0,0,0.2)",
         }}
       >
         <span style={{ transform: "rotate(-45deg)", fontSize: 14, lineHeight: 1 }}>
@@ -128,8 +150,8 @@ const OP_BG: Record<string, string> = {
   completed: "rgba(71,85,105,0.85)",
 };
 
-function OpMarker({ data, selected, onClick }: {
-  data: OperationPin; selected: boolean; onClick: () => void;
+function OpMarker({ data, selected, onClick, isDark }: {
+  data: OperationPin; selected: boolean; onClick: () => void; isDark: boolean;
 }) {
   return (
     <div
@@ -140,14 +162,18 @@ function OpMarker({ data, selected, onClick }: {
       <div
         className="op-inner"
         style={{
-          background: selected ? "#115E54" : OP_BG[data.status],
+          background: selected ? (isDark ? "#48A15E" : "#115E54") : OP_BG[data.status],
           borderRadius: 20, padding: "5px 12px",
           color: "#fff", fontSize: 11, fontWeight: 700,
           maxWidth: 120, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           boxShadow: selected
-            ? "0 0 0 3px #fff, 0 8px 24px rgba(0,0,0,0.3)"
-            : "0 4px 16px rgba(0,0,0,0.25)",
-          border: selected ? "2px solid rgba(255,255,255,0.8)" : "1.5px solid rgba(255,255,255,0.25)",
+            ? isDark
+              ? "0 0 0 3px rgba(149,199,143,0.3), 0 8px 24px rgba(0,0,0,0.45)"
+              : "0 0 0 3px #fff, 0 8px 24px rgba(0,0,0,0.3)"
+            : isDark
+              ? "0 4px 16px rgba(0,0,0,0.45)"
+              : "0 4px 16px rgba(0,0,0,0.25)",
+          border: selected ? `2px solid ${isDark ? "#95C78F" : "rgba(255,255,255,0.8)"}` : "1.5px solid rgba(255,255,255,0.25)",
         }}
       >
         {data.title.length > 18 ? data.title.slice(0, 18) + "…" : data.title}
@@ -158,26 +184,26 @@ function OpMarker({ data, selected, onClick }: {
 }
 
 // ── Cluster marker ────────────────────────────────────────────────────────────
-function ClusterMarker({ count, label, onClick }: { count: number; label: string; onClick: () => void }) {
+function ClusterMarker({ count, label, onClick, isDark }: { count: number; label: string; onClick: () => void; isDark: boolean }) {
   const size = count > 9 ? 52 : 44;
   return (
     <div className="cluster-marker" onClick={onClick}>
       <div style={{
         width: size, height: size, borderRadius: "50%",
         background: "linear-gradient(135deg,#115E54,#2A8256)",
-        border: "3px solid #95C78F",
+        border: `3px solid ${isDark ? "#48A15E" : "#95C78F"}`,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        color: "#fff", boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+        color: "#fff", boxShadow: isDark ? "0 6px 20px rgba(0,0,0,0.45)" : "0 6px 20px rgba(0,0,0,0.3)",
         gap: 1,
       }}>
         {/* connected-node icon — three dots + lines */}
         <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-          <circle cx="2" cy="5" r="2" fill="#95C78F"/>
-          <circle cx="14" cy="2" r="2" fill="#95C78F"/>
-          <circle cx="14" cy="8" r="2" fill="#95C78F"/>
-          <line x1="4" y1="5" x2="12" y2="2" stroke="#95C78F" strokeWidth="1.2" strokeDasharray="2 1"/>
-          <line x1="4" y1="5" x2="12" y2="8" stroke="#95C78F" strokeWidth="1.2" strokeDasharray="2 1"/>
+          <circle cx="2" cy="5" r="2" fill={isDark ? "#48A15E" : "#95C78F"}/>
+          <circle cx="14" cy="2" r="2" fill={isDark ? "#48A15E" : "#95C78F"}/>
+          <circle cx="14" cy="8" r="2" fill={isDark ? "#48A15E" : "#95C78F"}/>
+          <line x1="4" y1="5" x2="12" y2="2" stroke={isDark ? "#48A15E" : "#95C78F"} strokeWidth="1.2" strokeDasharray="2 1"/>
+          <line x1="4" y1="5" x2="12" y2="8" stroke={isDark ? "#48A15E" : "#95C78F"} strokeWidth="1.2" strokeDasharray="2 1"/>
         </svg>
         <span style={{ fontSize: 10, fontWeight: 800, lineHeight: 1 }}>{count}+</span>
       </div>
@@ -216,6 +242,8 @@ export default function DeploymentMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cssInjected  = useRef(false);
   const { user } = useNGOAuth();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const {
     mapRef, mapReady, initMap,
@@ -331,13 +359,17 @@ export default function DeploymentMap() {
   const resClusters  = zoom < CLUSTER_ZOOM ? computeClusters(resources, GRID) : null;
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div className={`relative w-full h-full overflow-hidden ${isDark ? "map-theme-dark" : "map-theme-light"}`}>
       <div ref={containerRef} className="w-full h-full" />
 
       {mapReady && (
         <div
           className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold"
-          style={{ background: "rgba(11,61,54,0.88)", color: "#95C78F", border: "1px solid rgba(149,199,143,0.3)" }}
+          style={{
+            background: isDark ? "rgba(18,38,34,0.92)" : "rgba(11,61,54,0.88)",
+            color: isDark ? "#95C78F" : "#95C78F",
+            border: isDark ? "1px solid rgba(149,199,143,0.35)" : "1px solid rgba(149,199,143,0.3)",
+          }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#95C78F", display: "inline-block", animation: "pulse-ring 1.8s ease-out infinite" }} />
           {liveVols.length > 0 ? `${liveVols.length} LIVE` : "NO VOLUNTEERS SHARING"}
@@ -357,12 +389,13 @@ export default function DeploymentMap() {
                       <CustomHtmlMarker key={c.items[0].id} map={mapRef.current} position={c.center}
                         zIndex={selected?.data?.id === c.items[0].id ? 20 : 5}>
                         <VolMarker data={c.items[0]} selected={selected?.data?.id === c.items[0].id}
+                          isDark={isDark}
                           onClick={() => handleVolClick(c.items[0])} />
                       </CustomHtmlMarker>
                     )
                     : (
                       <CustomHtmlMarker key={`vc-${i}`} map={mapRef.current} position={c.center} zIndex={10}>
-                        <ClusterMarker count={c.items.length} label="Volunteers"
+                        <ClusterMarker count={c.items.length} label="Volunteers" isDark={isDark}
                           onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? 5) + 2)} />
                       </CustomHtmlMarker>
                     )
@@ -371,6 +404,7 @@ export default function DeploymentMap() {
                   <CustomHtmlMarker key={v.id} map={mapRef.current} position={{ lat: v.lat, lng: v.lng }}
                     zIndex={selected?.data?.id === v.id ? 20 : 5}>
                     <VolMarker data={v} selected={selected?.data?.id === v.id}
+                      isDark={isDark}
                       onClick={() => handleVolClick(v)} />
                   </CustomHtmlMarker>
                 ))
@@ -385,12 +419,13 @@ export default function DeploymentMap() {
                       <CustomHtmlMarker key={c.items[0].id} map={mapRef.current} position={c.center}
                         zIndex={selected?.data?.id === c.items[0].id ? 20 : 8}>
                         <OpMarker data={c.items[0]} selected={selected?.data?.id === c.items[0].id}
+                          isDark={isDark}
                           onClick={() => select("operation", c.items[0])} />
                       </CustomHtmlMarker>
                     )
                     : (
                       <CustomHtmlMarker key={`oc-${i}`} map={mapRef.current} position={c.center} zIndex={10}>
-                        <ClusterMarker count={c.items.length} label="Operations"
+                        <ClusterMarker count={c.items.length} label="Operations" isDark={isDark}
                           onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? 5) + 2)} />
                       </CustomHtmlMarker>
                     )
@@ -399,6 +434,7 @@ export default function DeploymentMap() {
                   <CustomHtmlMarker key={op.id} map={mapRef.current} position={{ lat: op.lat, lng: op.lng }}
                     zIndex={selected?.data?.id === op.id ? 20 : 8}>
                     <OpMarker data={op} selected={selected?.data?.id === op.id}
+                      isDark={isDark}
                       onClick={() => select("operation", op)} />
                   </CustomHtmlMarker>
                 ))
@@ -413,12 +449,13 @@ export default function DeploymentMap() {
                       <CustomHtmlMarker key={c.items[0].id} map={mapRef.current} position={c.center}
                         zIndex={selected?.data?.id === c.items[0].id ? 20 : 3}>
                         <ResMarker data={c.items[0]} selected={selected?.data?.id === c.items[0].id}
+                          isDark={isDark}
                           onClick={() => select("resource", c.items[0])} />
                       </CustomHtmlMarker>
                     )
                     : (
                       <CustomHtmlMarker key={`rc-${i}`} map={mapRef.current} position={c.center} zIndex={10}>
-                        <ClusterMarker count={c.items.length} label="Resources"
+                        <ClusterMarker count={c.items.length} label="Resources" isDark={isDark}
                           onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? 5) + 2)} />
                       </CustomHtmlMarker>
                     )
@@ -427,6 +464,7 @@ export default function DeploymentMap() {
                   <CustomHtmlMarker key={r.id} map={mapRef.current} position={{ lat: r.lat, lng: r.lng }}
                     zIndex={selected?.data?.id === r.id ? 20 : 3}>
                     <ResMarker data={r} selected={selected?.data?.id === r.id}
+                      isDark={isDark}
                       onClick={() => select("resource", r)} />
                   </CustomHtmlMarker>
                 ))

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import SaathiMap from "../map/SynapseMap";
+import DeploymentMap from "../map/DeploymentMap";
 import StatsBar from "./StatsBar";
 import NeedList from "./NeedList";
 import FileUpload from "../upload/FileUpload";
@@ -206,13 +206,7 @@ export default function NGODashboard() {
           <div className="flex-1 relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
             {viewMode === "map" ? (
               <>
-                <SaathiMap
-                  needs={needs}
-                  volunteers={vols}
-                  hotspots={hotspots}
-                  showVolunteers={showVolunteers}
-                  onMarkerClick={(need: any) => setSelectedNeed(need)}
-                />
+                <DeploymentMap />
 
                 {selectedNeed && (
                   <div className="absolute top-4 right-4 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-5 w-72 z-10 animate-[slice-in_0.3s_ease-out]">
