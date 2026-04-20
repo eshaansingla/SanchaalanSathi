@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "../../lib/ngo-api";
+import { api, friendlyError } from "../../lib/ngo-api";
 import { useNGOAuth } from "../../lib/ngo-auth";
 import { Building2, Users, Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
@@ -48,7 +48,7 @@ export default function RegisterPage() {
         router.push("/vol/dashboard");
       }
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, UserRole } from "../../lib/auth";
 import { ThemeToggle } from "../../components/ui/ThemeToggle";
 import { Building2, Users, AlertCircle } from "lucide-react";
+import { friendlyError } from "../../lib/ngo-api";
 
 export default function SelectRolePage() {
   const { user, role, loading, setUserRole } = useAuth();
@@ -28,7 +29,7 @@ export default function SelectRolePage() {
       router.replace(selected === "NGO" ? "/ngo-dashboard" : "/volunteer-dashboard");
     } catch (err: any) {
       console.error("[SelectRole] setUserRole failed:", err);
-      setError(err?.message ?? "Failed to save role. Please try again.");
+      setError(friendlyError(err));
       setSelecting(false);
     }
   };

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { ClipboardList, CheckCircle, Clock, AlertCircle, Loader2, CheckCheck, XCircle, Sparkles, Star } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import { api, RecommendedTask } from "../../../lib/ngo-api";
+import { api, RecommendedTask, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type Assignment = {
@@ -51,7 +51,7 @@ export default function VolDashboardPage() {
       api.getRecommendations(user.token).catch(() => []),
     ])
       .then(([d, r]) => { setData(d as DashData); setRecs(r as RecommendedTask[]); })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   };
 
@@ -68,7 +68,7 @@ export default function VolDashboardPage() {
       if (action === "accept") await api.acceptAssignment(user.token, id);
       else                     await api.rejectAssignment(user.token, id);
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setActing(null); }
   };
 
@@ -78,7 +78,7 @@ export default function VolDashboardPage() {
     try {
       await api.completeAssignment(user.token, id);
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setCompleting(null); }
   };
 
@@ -120,7 +120,7 @@ export default function VolDashboardPage() {
               transition={{ delay: i * 0.07 }}
               whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(42,130,86,0.18)", borderColor: "#95C78F" }}
               className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-2 cursor-default"
-              style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+              style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
             >
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -151,7 +151,7 @@ export default function VolDashboardPage() {
                 transition={{ delay: i * 0.06 }}
                 whileHover={{ y: -3, boxShadow: "0 12px 28px rgba(42,130,86,0.18)", borderColor: "#95C78F" }}
                 className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-2"
-                style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+                style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-semibold text-gray-800 line-clamp-2 flex-1">{r.title}</p>
@@ -201,7 +201,7 @@ export default function VolDashboardPage() {
           <motion.div
             whileHover={{ y: -2, borderColor: "#95C78F" }}
             className="rounded-2xl border border-gray-200 p-8 text-center text-sm text-gray-400"
-            style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+            style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
           >
             No assignments yet. Your NGO coordinator will assign tasks to you.
           </motion.div>

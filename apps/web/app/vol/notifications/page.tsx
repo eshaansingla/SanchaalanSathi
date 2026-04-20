@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Bell, ClipboardList, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type Notification = {
@@ -30,7 +30,7 @@ export default function NotificationsPage() {
     if (!user) return;
     api.volNotifications(user.token)
       .then((n) => setNotifs(n as Notification[]))
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   };
 

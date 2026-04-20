@@ -1,7 +1,7 @@
 import uuid
 import datetime
 from sqlalchemy import (
-    String, Text, Integer, Boolean, DateTime,
+    String, Text, Integer, Float, Boolean, DateTime, Date,
     ForeignKey, JSON, Index,
 )
 from sqlalchemy import Enum as SAEnum
@@ -53,11 +53,19 @@ class VolunteerProfile(Base):
     id:           Mapped[str] = mapped_column(String(36), primary_key=True, default=_gen_id)
     user_id:      Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), unique=True, nullable=False)
     ngo_id:       Mapped[str] = mapped_column(String(36), ForeignKey("ngos.id"), nullable=False)
-    skills:       Mapped[list] = mapped_column(JSON, default=list)
-    availability: Mapped[dict] = mapped_column(JSON, default=dict)
-    status:       Mapped[str] = mapped_column(
+    skills:         Mapped[list]         = mapped_column(JSON, default=list)
+    availability:   Mapped[dict]         = mapped_column(JSON, default=dict)
+    status:         Mapped[str]          = mapped_column(
         SAEnum("active", "inactive", name="vol_status"), default="active"
     )
+    share_location: Mapped[bool]         = mapped_column(Boolean, default=False, server_default="false")
+    lat:            Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng:            Mapped[float | None] = mapped_column(Float, nullable=True)
+    full_name:      Mapped[str | None]   = mapped_column(String(200), nullable=True)
+    phone:          Mapped[str | None]   = mapped_column(String(30), nullable=True)
+    city:           Mapped[str | None]   = mapped_column(String(100), nullable=True)
+    bio:            Mapped[str | None]   = mapped_column(Text, nullable=True)
+    date_of_birth:  Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
 
 
 # ── Tasks ────────────────────────────────────────────────────────────────────
@@ -78,6 +86,8 @@ class Task(Base):
         SAEnum("open", "in_progress", "completed", "cancelled", name="task_status"), default="open"
     )
     deadline:        Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    lat:             Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng:             Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at:      Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
 
@@ -95,6 +105,8 @@ class Assignment(Base):
         SAEnum("assigned", "accepted", "rejected", "completed", name="assign_status"), default="assigned"
     )
     assigned_at:  Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    accepted_at:  Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 # ── Resources ────────────────────────────────────────────────────────────────
@@ -111,6 +123,8 @@ class Resource(Base):
         SAEnum("available", "in_use", "depleted", name="res_status"), default="available"
     )
     metadata_:           Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    lat:                 Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng:                 Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 # ── Allocations ──────────────────────────────────────────────────────────────
@@ -175,3 +189,21 @@ class Notification(Base):
     )
     is_read:    Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+
+# ── Task Enrollment Requests ──────────────────────────────────────────────────
+
+class TaskEnrollmentRequest(Base):
+    __tablename__ = "task_enrollment_requests"
+    __table_args__ = (Index("ix_enroll_ngo_id", "ngo_id"),)
+
+    id:           Mapped[str] = mapped_column(String(36), primary_key=True, default=_gen_id)
+    task_id:      Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False)
+    volunteer_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    ngo_id:       Mapped[str] = mapped_column(String(36), ForeignKey("ngos.id"), nullable=False)
+    reason:       Mapped[str] = mapped_column(Text, default="")
+    why_useful:   Mapped[str] = mapped_column(Text, default="")
+    status:       Mapped[str] = mapped_column(
+        SAEnum("pending", "approved", "rejected", name="enroll_status"), default="pending"
+    )
+    created_at:   Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)

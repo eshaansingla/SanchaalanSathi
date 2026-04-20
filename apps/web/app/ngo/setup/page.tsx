@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 export default function NGOSetupPage() {
@@ -26,9 +26,9 @@ export default function NGOSetupPage() {
       document.cookie = `ngo_token=${res.token}; path=/; max-age=${60 * 60 * 24}`;
       const p = JSON.parse(atob(res.token.split(".")[1]));
       setUser({ ...user, ngo_id: p.ngo_id, token: res.token, needs_ngo_setup: false });
-      router.push("/ngo/dashboard");
+      window.location.href = "/ngo/dashboard";
     } catch (err: unknown) {
-      setError((err as Error).message || "Something went wrong");
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,26 @@
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
+/** Map any thrown value to a user-friendly message — never show raw backend detail. */
+export function friendlyError(e: unknown): string {
+  const msg = (e instanceof Error ? e.message : String(e)) || "";
+  if (!msg || msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("fetch"))
+    return "Cannot reach server. Check your connection and try again.";
+  if (msg.includes("401") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("not authenticated"))
+    return "Session expired. Please sign in again.";
+  if (msg.includes("403") || msg.toLowerCase().includes("forbidden") || msg.toLowerCase().includes("permission"))
+    return "You don't have permission to do that.";
+  if (msg.includes("404") || msg.toLowerCase().includes("not found"))
+    return "The requested item was not found.";
+  if (msg.includes("invite") || msg.toLowerCase().includes("invite_code"))
+    return "Invalid or expired invite code. Ask your NGO admin for a new one.";
+  if (msg.includes("500") || msg.includes("503") || msg.toLowerCase().includes("server error") || msg.toLowerCase().includes("database"))
+    return "Something went wrong on our end. Please try again shortly.";
+  // Short, human-readable messages from backend are OK to show as-is (e.g. validation errors)
+  if (msg.length <= 120 && !msg.includes("Traceback") && !msg.includes("sqlalchemy") && !msg.includes("asyncpg"))
+    return msg;
+  return "Something went wrong. Please try again.";
+}
+
 function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
@@ -57,6 +78,10 @@ export const api = {
       body: JSON.stringify(body),
     }).then(handleRes<{ token: string; role: string; ngo_id: string | null; needs_ngo_setup?: boolean }>),
 
+  lookupNGO: (inviteCode: string) =>
+    fetch(`${BASE}/api/auth/ngo/lookup/${encodeURIComponent(inviteCode)}`)
+      .then(handleRes<{ ngo_name: string; invite_code: string }>),
+
   createNGO: (token: string, body: { name: string; description: string }) =>
     ngoPost<{ token: string; ngo_id: string; invite_code: string; name: string }>(
       "/api/auth/ngo/create", token, body
@@ -74,12 +99,18 @@ export const api = {
   deactivateVolunteer: (token: string, id: string) =>
     ngoPost<any>(`/api/ngo/volunteers/${id}/deactivate`, token),
 
+  volunteerLocations: (token: string) =>
+    ngoGet<any[]>("/api/ngo/volunteer-locations", token),
+
+  volunteerProfile: (token: string, userId: string) =>
+    ngoGet<any>(`/api/ngo/volunteers/${userId}/profile`, token),
+
   ngoTasks: (token: string, params?: { status?: string }) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return ngoGet<any[]>(`/api/ngo/tasks${q ? `?${q}` : ""}`, token);
   },
 
-  createTask: (token: string, body: { title: string; description: string; required_skills: string[]; deadline?: string }) =>
+  createTask: (token: string, body: { title: string; description: string; required_skills: string[]; deadline?: string; lat?: number; lng?: number }) =>
     ngoPost<{ id: string; title: string; status: string }>("/api/ngo/tasks", token, body),
 
   updateTask: (token: string, id: string, body: object) =>
@@ -97,7 +128,7 @@ export const api = {
   ngoResources: (token: string) =>
     ngoGet<any[]>("/api/ngo/resources", token),
 
-  createResource: (token: string, body: { type: string; quantity: number; metadata?: object }) =>
+  createResource: (token: string, body: { type: string; quantity: number; metadata?: object; lat?: number; lng?: number }) =>
     ngoPost<any>("/api/ngo/resources", token, body),
 
   updateResource: (token: string, id: string, body: object) =>
@@ -119,8 +150,15 @@ export const api = {
   volProfile: (token: string) =>
     ngoGet<any>("/api/volunteer/profile", token),
 
-  updateVolProfile: (token: string, body: { skills?: string[]; availability?: object }) =>
+  updateVolProfile: (token: string, body: { skills?: string[]; availability?: object; full_name?: string; phone?: string; city?: string; bio?: string; date_of_birth?: string }) =>
     ngoPut<any>("/api/volunteer/profile", token, body),
+
+  updateVolLocation: (token: string, lat: number, lng: number) =>
+    ngoPut<any>("/api/volunteer/location", token, { lat, lng, share_location: true }),
+
+  clearVolLocation: (token: string) =>
+    fetch(`${BASE}/api/volunteer/location`, { method: "DELETE", headers: authHeaders(token) })
+      .then(handleRes<any>),
 
   volTasks: (token: string) =>
     ngoGet<any[]>("/api/volunteer/tasks", token),
@@ -145,6 +183,36 @@ export const api = {
 
   getRecommendations: (token: string) =>
     ngoGet<RecommendedTask[]>("/api/volunteer/recommendations", token),
+
+  volOpenTasks: (token: string) =>
+    ngoGet<any[]>("/api/volunteer/open-tasks", token),
+
+  volEnroll: (token: string, taskId: string, body: { reason: string; why_useful: string }) =>
+    ngoPost<any>(`/api/volunteer/tasks/${taskId}/enroll`, token, body),
+
+  volEnrollmentRequests: (token: string) =>
+    ngoGet<any[]>("/api/volunteer/enrollment-requests", token),
+
+  ngoEnrollmentRequests: (token: string, status?: string) =>
+    ngoGet<any[]>(`/api/ngo/enrollment-requests${status ? `?status=${encodeURIComponent(status)}` : ""}`, token),
+
+  approveEnrollment: (token: string, reqId: string) =>
+    ngoPost<any>(`/api/ngo/enrollment-requests/${reqId}/approve`, token),
+
+  rejectEnrollment: (token: string, reqId: string) =>
+    ngoPost<any>(`/api/ngo/enrollment-requests/${reqId}/reject`, token),
+
+  pingTask: (token: string, taskId: string, message?: string) =>
+    ngoPost<{ count: number }>(`/api/ngo/tasks/${taskId}/ping`, token, { message }),
+
+  ngoNotifications: (token: string) =>
+    ngoGet<any[]>("/api/ngo/notifications", token),
+
+  markNgoNotifRead: (token: string, id: string) =>
+    ngoPost<any>(`/api/ngo/notifications/${id}/read`, token),
+
+  markAllNgoNotifsRead: (token: string) =>
+    ngoPost<{ marked: number }>("/api/ngo/notifications/read-all", token),
 
   // Events
   listEvents: (token: string) =>

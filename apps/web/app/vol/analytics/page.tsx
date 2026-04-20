@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { BarChart2, Sparkles, Trophy, CheckCircle, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
-import { api, RecommendedTask } from "../../../lib/ngo-api";
+import { api, RecommendedTask, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 const BADGES = [
@@ -60,7 +60,7 @@ export default function VolAnalyticsPage() {
         })));
         setRecs(r as RecommendedTask[]);
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   }, [user]);
 

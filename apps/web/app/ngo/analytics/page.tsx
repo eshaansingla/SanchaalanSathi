@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
 } from "recharts";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type AnalyticsData = {
@@ -32,7 +32,7 @@ export default function AnalyticsPage() {
     if (!user) return;
     api.ngoAnalytics(user.token)
       .then((d) => setData(d as AnalyticsData))
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   }, [user]);
 

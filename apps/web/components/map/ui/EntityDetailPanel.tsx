@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "motion/react";
 import { X, User, Zap, Package } from "lucide-react";
 import { SelectionType } from "../hooks/useMapController";
-import { VolunteerPin, OperationPin, ResourcePin } from "../data/dummyData";
+import { VolunteerPin, OperationPin, ResourcePin } from "../data/types";
 
 interface Props {
   entity: SelectionType;
@@ -50,6 +50,21 @@ function VolunteerPanel({ data }: { data: VolunteerPin }) {
               </span>
             ))}
           </div>
+        </div>
+      )}
+      {data.email && (
+        <p className="text-[10px] text-gray-400">{data.email}</p>
+      )}
+      {data.performanceScore !== undefined && (
+        <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 space-y-1.5">
+          <div className="flex justify-between text-[10px] text-gray-400">
+            <span>Performance</span>
+            <span className="font-bold" style={{ color: "#2A8256" }}>{data.performanceScore.toFixed(0)}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${data.performanceScore}%`, background: "linear-gradient(90deg,#2A8256,#48A15E)" }} />
+          </div>
+          <p className="text-[10px] text-gray-400">{data.completedTasks ?? 0} tasks completed</p>
         </div>
       )}
       {data.assignedTo && (

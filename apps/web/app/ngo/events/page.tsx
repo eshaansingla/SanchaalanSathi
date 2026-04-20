@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Calendar, Plus, Trash2, Users, X, Loader2, AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type EventRow = {
@@ -61,7 +61,7 @@ export default function NGOEventsPage() {
     setLoading(true);
     api.listEvents(user.token)
       .then((d) => setEvents(d as EventRow[]))
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   };
 
@@ -82,7 +82,7 @@ export default function NGOEventsPage() {
       setShowCreate(false);
       setForm({ title: "", description: "", event_type: "drive", date: "", location: "", max_volunteers: 0, status: "upcoming" });
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setSubmitting(false); }
   };
 
@@ -90,7 +90,7 @@ export default function NGOEventsPage() {
     if (!user) return;
     setDeleting(id);
     try { await api.deleteEvent(user.token, id); load(); }
-    catch (e: any) { setError(e.message); }
+    catch (e: any) { setError(friendlyError(e)); }
     finally { setDeleting(null); }
   };
 
@@ -99,7 +99,7 @@ export default function NGOEventsPage() {
     setAttendEvent(ev);
     setAttendLoading(true);
     try { setAttendees(await api.getAttendance(user.token, ev.id)); }
-    catch (e: any) { setError(e.message); }
+    catch (e: any) { setError(friendlyError(e)); }
     finally { setAttendLoading(false); }
   };
 
@@ -110,7 +110,7 @@ export default function NGOEventsPage() {
     try {
       await api.markAttendance(user.token, attendEvent.id, volId, next);
       setAttendees((a) => a.map((r) => r.volunteer_id === volId ? { ...r, status: next } : r));
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setToggling(null); }
   };
 

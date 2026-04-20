@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { NGOAuthProvider, useNGOAuth } from "../../lib/ngo-auth";
+import { friendlyError } from "../../lib/ngo-api";
 
 function LoginForm() {
   const router   = useRouter();
@@ -28,7 +29,7 @@ function LoginForm() {
         router.push("/vol/dashboard");
       }
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }

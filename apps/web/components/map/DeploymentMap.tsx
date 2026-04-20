@@ -6,7 +6,9 @@ import { useMapController } from "./hooks/useMapController";
 import CustomHtmlMarker from "./markers/CustomHtmlMarker";
 import FilterBar from "./ui/FilterBar";
 import EntityDetailPanel from "./ui/EntityDetailPanel";
-import { VOLUNTEERS, OPERATIONS, RESOURCES, VolunteerPin } from "./data/dummyData";
+import { VolunteerPin, OperationPin, ResourcePin } from "./data/types";
+import { api } from "../../lib/ngo-api";
+import { useNGOAuth } from "../../lib/ngo-auth";
 
 // ── CSS keyframes injected once into <head> ───────────────────────────────────
 const MAP_CSS = `
@@ -95,7 +97,7 @@ function VolMarker({ data, selected, onClick }: {
 const RES_ICONS: Record<string, string> = { medical: "💊", food: "🍱", equipment: "🔧" };
 
 function ResMarker({ data, selected, onClick }: {
-  data: typeof RESOURCES[0]; selected: boolean; onClick: () => void;
+  data: ResourcePin; selected: boolean; onClick: () => void;
 }) {
   return (
     <div className="res-marker" onClick={onClick} style={{ cursor: "pointer" }}>
@@ -127,7 +129,7 @@ const OP_BG: Record<string, string> = {
 };
 
 function OpMarker({ data, selected, onClick }: {
-  data: typeof OPERATIONS[0]; selected: boolean; onClick: () => void;
+  data: OperationPin; selected: boolean; onClick: () => void;
 }) {
   return (
     <div
@@ -202,25 +204,18 @@ function computeClusters<T extends AnyPin>(pins: T[], gridSize: number): { cente
   });
 }
 
-// ── Simulation helpers ────────────────────────────────────────────────────────
-const STATUSES: Array<"available" | "busy"> = ["available", "busy"];
-function simulateTick(vols: VolunteerPin[]): VolunteerPin[] {
-  // randomly toggle 1-2 volunteers per tick
-  const indices = new Set<number>();
-  while (indices.size < Math.min(2, vols.length)) {
-    indices.add(Math.floor(Math.random() * vols.length));
-  }
-  return vols.map((v, i) =>
-    indices.has(i)
-      ? { ...v, status: STATUSES[(STATUSES.indexOf(v.status) + 1) % 2] }
-      : v
-  );
+function emailToInitials(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return local.slice(0, 2).toUpperCase();
 }
 
 // ── Main container ────────────────────────────────────────────────────────────
 export default function DeploymentMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cssInjected  = useRef(false);
+  const { user } = useNGOAuth();
 
   const {
     mapRef, mapReady, initMap,
@@ -229,8 +224,9 @@ export default function DeploymentMap() {
     drawRoutingLines,
   } = useMapController();
 
-  // Live volunteer state for simulation
-  const [liveVols, setLiveVols] = useState<VolunteerPin[]>(VOLUNTEERS);
+  const [liveVols, setLiveVols]   = useState<VolunteerPin[]>([]);
+  const [operations, setOps]      = useState<OperationPin[]>([]);
+  const [resources, setResources] = useState<ResourcePin[]>([]);
 
   // Zoom state for clustering
   const [zoom, setZoom] = useState(5);
@@ -247,25 +243,83 @@ export default function DeploymentMap() {
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    drawRoutingLines(liveVols, OPERATIONS);
+    drawRoutingLines(liveVols, operations);
     const listener = mapRef.current.addListener("zoom_changed", () => {
       setZoom(mapRef.current?.getZoom() ?? 5);
     });
     return () => google.maps.event.removeListener(listener);
   }, [mapReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Simulation — toggle statuses every 3s
+  // Poll volunteers/tasks/resources every 15s
   useEffect(() => {
-    const id = setInterval(() => {
-      setLiveVols((prev) => simulateTick(prev));
-    }, 3000);
+    if (!user) return;
+    const fetchAll = () => {
+      api.volunteerLocations(user.token).then((rows: any[]) => {
+        setLiveVols(rows.map((r) => ({
+          id:       r.user_id,
+          user_id:  r.user_id,
+          name:     r.email,
+          email:    r.email,
+          lat:      r.lat,
+          lng:      r.lng,
+          status:   r.status === "active" ? "available" : "busy",
+          skills:   r.skills ?? [],
+          initials: emailToInitials(r.email),
+        })));
+      }).catch(() => {});
+
+      api.ngoTasks(user.token).then((rows: any[]) => {
+        setOps(rows
+          .filter((t) => t.lat != null && t.lng != null)
+          .map((t) => ({
+            id:          t.id,
+            title:       t.title,
+            lat:         t.lat,
+            lng:         t.lng,
+            status:      t.status === "open" ? "active" : t.status === "in_progress" ? "active" : t.status === "completed" ? "completed" : "active",
+            assigned:    0,
+            needed:      0,
+            description: t.description ?? "",
+          })));
+      }).catch(() => {});
+
+      api.ngoResources(user.token).then((rows: any[]) => {
+        setResources(rows
+          .filter((r) => r.lat != null && r.lng != null)
+          .map((r) => ({
+            id:    r.id,
+            title: r.type,
+            lat:   r.lat,
+            lng:   r.lng,
+            type:  (["medical", "food", "equipment"].includes(r.type) ? r.type : "equipment") as "medical" | "food" | "equipment",
+            stock: r.quantity ?? 0,
+          })));
+      }).catch(() => {});
+    };
+    fetchAll();
+    const id = setInterval(fetchAll, 15000);
     return () => clearInterval(id);
-  }, []);
+  }, [user]);
 
   // Redraw routing lines when live volunteer positions/assignments update
   useEffect(() => {
-    if (mapReady) drawRoutingLines(liveVols, OPERATIONS);
+    if (mapReady) drawRoutingLines(liveVols, operations);
   }, [liveVols, mapReady, drawRoutingLines]);
+
+  const handleVolClick = useCallback((v: VolunteerPin) => {
+    select("volunteer", v);
+    if (!user || v.performanceScore !== undefined) return;
+    api.volunteerProfile(user.token, v.user_id!).then((p: any) => {
+      const enriched: VolunteerPin = {
+        ...v,
+        email:            p.email,
+        completedTasks:   p.completed_tasks,
+        performanceScore: p.performance_score,
+      };
+      setLiveVols((prev) => prev.map((x) => x.id === v.id ? enriched : x));
+      select("volunteer", enriched);
+    }).catch(() => {});
+  }, [user, select]);
 
   const show = (type: string) => filter === "all" || filter === type;
 
@@ -273,21 +327,20 @@ export default function DeploymentMap() {
   const CLUSTER_ZOOM = 7;
   const GRID = 5;
   const volClusters  = zoom < CLUSTER_ZOOM ? computeClusters(liveVols, GRID) : null;
-  const opClusters   = zoom < CLUSTER_ZOOM ? computeClusters(OPERATIONS, GRID) : null;
-  const resClusters  = zoom < CLUSTER_ZOOM ? computeClusters(RESOURCES, GRID) : null;
+  const opClusters   = zoom < CLUSTER_ZOOM ? computeClusters(operations, GRID) : null;
+  const resClusters  = zoom < CLUSTER_ZOOM ? computeClusters(resources, GRID) : null;
 
   return (
     <div className="relative w-full h-full overflow-hidden">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Simulation badge */}
       {mapReady && (
         <div
           className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold"
           style={{ background: "rgba(11,61,54,0.88)", color: "#95C78F", border: "1px solid rgba(149,199,143,0.3)" }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#95C78F", display: "inline-block", animation: "pulse-ring 1.8s ease-out infinite" }} />
-          LIVE SIM
+          {liveVols.length > 0 ? `${liveVols.length} LIVE` : "NO VOLUNTEERS SHARING"}
         </div>
       )}
 
@@ -304,7 +357,7 @@ export default function DeploymentMap() {
                       <CustomHtmlMarker key={c.items[0].id} map={mapRef.current} position={c.center}
                         zIndex={selected?.data?.id === c.items[0].id ? 20 : 5}>
                         <VolMarker data={c.items[0]} selected={selected?.data?.id === c.items[0].id}
-                          onClick={() => select("volunteer", c.items[0])} />
+                          onClick={() => handleVolClick(c.items[0])} />
                       </CustomHtmlMarker>
                     )
                     : (
@@ -318,7 +371,7 @@ export default function DeploymentMap() {
                   <CustomHtmlMarker key={v.id} map={mapRef.current} position={{ lat: v.lat, lng: v.lng }}
                     zIndex={selected?.data?.id === v.id ? 20 : 5}>
                     <VolMarker data={v} selected={selected?.data?.id === v.id}
-                      onClick={() => select("volunteer", v)} />
+                      onClick={() => handleVolClick(v)} />
                   </CustomHtmlMarker>
                 ))
           )}
@@ -342,7 +395,7 @@ export default function DeploymentMap() {
                       </CustomHtmlMarker>
                     )
                 ))
-              : OPERATIONS.map((op) => (
+              : operations.map((op) => (
                   <CustomHtmlMarker key={op.id} map={mapRef.current} position={{ lat: op.lat, lng: op.lng }}
                     zIndex={selected?.data?.id === op.id ? 20 : 8}>
                     <OpMarker data={op} selected={selected?.data?.id === op.id}
@@ -370,7 +423,7 @@ export default function DeploymentMap() {
                       </CustomHtmlMarker>
                     )
                 ))
-              : RESOURCES.map((r) => (
+              : resources.map((r) => (
                   <CustomHtmlMarker key={r.id} map={mapRef.current} position={{ lat: r.lat, lng: r.lng }}
                     zIndex={selected?.data?.id === r.id ? 20 : 3}>
                     <ResMarker data={r} selected={selected?.data?.id === r.id}

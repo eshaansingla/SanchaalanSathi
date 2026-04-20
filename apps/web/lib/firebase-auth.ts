@@ -1,7 +1,5 @@
 import {
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -10,9 +8,6 @@ import {
   type Unsubscribe,
 } from "firebase/auth";
 import { auth } from "./firebase";
-
-const SESSION_ROLE_KEY   = "_signin_role";
-const SESSION_INVITE_KEY = "_signin_invite";
 
 function makeProvider(): GoogleAuthProvider {
   const p = new GoogleAuthProvider();
@@ -35,46 +30,6 @@ export async function signInWithGoogle(): Promise<User> {
     return result.user;
   } finally {
     _popupInFlight = false;
-  }
-}
-
-/**
- * Redirect fallback for browsers that block popups (third-party cookie restrictions).
- * Saves role + inviteCode to sessionStorage so they survive the page reload.
- */
-export function startGoogleRedirect(role: "ngo_admin" | "volunteer", inviteCode: string): void {
-  if (!auth) throw new Error("Firebase is not configured. Add NEXT_PUBLIC_FIREBASE_* env vars.");
-  try {
-    sessionStorage.setItem(SESSION_ROLE_KEY, role);
-    sessionStorage.setItem(SESSION_INVITE_KEY, inviteCode);
-  } catch { /* private browsing — proceed without storage */ }
-  signInWithRedirect(auth, makeProvider());
-}
-
-/**
- * Call on page mount. Resolves with Firebase user + saved role/inviteCode
- * if the page was loaded after a redirect sign-in. Returns null otherwise.
- */
-export async function getGoogleRedirectResult(): Promise<{
-  user: User;
-  role: "ngo_admin" | "volunteer";
-  inviteCode: string;
-} | null> {
-  if (!auth) return null;
-  try {
-    const result = await getRedirectResult(auth);
-    if (!result) return null;
-    let role: "ngo_admin" | "volunteer" = "ngo_admin";
-    let inviteCode = "";
-    try {
-      role = (sessionStorage.getItem(SESSION_ROLE_KEY) as typeof role) ?? "ngo_admin";
-      inviteCode = sessionStorage.getItem(SESSION_INVITE_KEY) ?? "";
-      sessionStorage.removeItem(SESSION_ROLE_KEY);
-      sessionStorage.removeItem(SESSION_INVITE_KEY);
-    } catch { /* ignore */ }
-    return { user: result.user, role, inviteCode };
-  } catch {
-    return null;
   }
 }
 

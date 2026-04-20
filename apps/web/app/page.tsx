@@ -8,8 +8,8 @@ import {
   Menu, X, ArrowRight, MapPin, Bell, CheckCircle2,
   ChevronRight, Star, TrendingUp, Clock,
 } from "lucide-react";
-import { signInWithGoogle as firebaseSignIn, startGoogleRedirect, getGoogleRedirectResult } from "@/lib/firebase-auth";
-import { api } from "@/lib/ngo-api";
+import { signInWithGoogle as firebaseSignIn } from "@/lib/firebase-auth";
+import { api, friendlyError } from "@/lib/ngo-api";
 
 // ── Shared sign-in logic ──────────────────────────────────────────────────────
 
@@ -23,15 +23,11 @@ async function exchangeAndRedirect(
   router: ReturnType<typeof useRouter>,
   setError: (e: string) => void,
   setBusy: (b: boolean) => void,
-  setStep: (s: string) => void,
 ): Promise<void> {
-  // Warn early if backend URL was not configured — request will fail.
   if (BACKEND.includes("localhost") && typeof window !== "undefined" && location.protocol === "https:") {
-    console.error("[auth] NEXT_PUBLIC_BACKEND_URL is not set — falling back to localhost:8000 which will fail on a deployed frontend.");
+    console.error("[auth] NEXT_PUBLIC_BACKEND_URL is not set — will fail on deployed frontend.");
   }
 
-  setStep("Connecting to server…");
-  // 60 s timeout — accounts for Render free-tier cold start (can take 30-50 s).
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60_000);
   try {
@@ -49,32 +45,18 @@ async function exchangeAndRedirect(
     clearTimeout(timeoutId);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const detail = body.detail || `Server error ${res.status}`;
-      console.error("[auth] Backend /api/auth/google failed:", res.status, body);
-      throw new Error(detail);
+      throw new Error(body.detail || `Server error ${res.status}`);
     }
     const data: { token: string; role: string; ngo_id: string | null; needs_ngo_setup?: boolean } = await res.json();
     localStorage.setItem("ngo_token", data.token);
     document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
-    setStep("Redirecting…");
     if (data.needs_ngo_setup) router.replace("/ngo/setup");
     else if (role === "ngo_admin") router.replace("/ngo/dashboard");
     else router.replace("/vol/dashboard");
   } catch (e: unknown) {
     clearTimeout(timeoutId);
-    const err = e as Error;
-    console.error("[auth] exchangeAndRedirect error:", err);
-    if (err.name === "AbortError") {
-      setError(`Server is taking too long to respond (backend: ${BACKEND}). It may be starting up — wait 30 s and try again.`);
-    } else if (err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError") || err.message?.includes("fetch")) {
-      setError(`Cannot reach backend (${BACKEND}). Check NEXT_PUBLIC_BACKEND_URL env var on your frontend deployment.`);
-    } else if (err.message?.includes("invite_code") || err.message?.includes("Invalid invite code")) {
-      setError("Invalid or expired invite code. Ask your NGO admin for a new one.");
-    } else {
-      setError(err.message || "Account setup failed. Please try again.");
-    }
+    setError(friendlyError(e));
     setBusy(false);
-    setStep("");
   }
 }
 
@@ -84,52 +66,35 @@ async function handleGoogleSignIn(
   router: ReturnType<typeof useRouter>,
   setError: (e: string) => void,
   setBusy: (b: boolean) => void,
-  setStep: (s: string) => void,
 ) {
   setError("");
   setBusy(true);
-  setStep("Signing in with Google…");
 
   let firebaseUser;
   try {
     firebaseUser = await firebaseSignIn();
   } catch (e: unknown) {
     const code = (e as { code?: string })?.code ?? "";
-    if (
-      code === "auth/popup-closed-by-user" ||
-      code === "auth/popup-blocked" ||
-      code === "auth/cancelled-popup-request"
-    ) {
-      // Browser blocked the popup or closed it (third-party cookie restriction).
-      // Automatically fall back to full-page redirect — no user action needed.
-      setStep("Popup blocked — switching to redirect sign-in…");
-      try {
-        startGoogleRedirect(role, inviteCode);
-        // Page will navigate away; no further action needed here.
-      } catch {
-        setError("Could not start sign-in. Check your internet connection and try again.");
-        setBusy(false);
-        setStep("");
-      }
-      return;
-    }
-    if (code === "auth/popup-in-flight") {
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+      // User dismissed the popup — not an error, just reset.
+    } else if (code === "auth/popup-blocked") {
+      setError("Pop-up was blocked by your browser. Allow pop-ups for this site and try again.");
+    } else if (code === "auth/popup-in-flight") {
       setError("Sign-in already in progress — please wait.");
     } else if (code === "auth/unauthorized-domain") {
-      setError("This domain is not authorised in Firebase — add it under Authentication → Settings → Authorised domains.");
+      setError("This domain is not authorised in Firebase. Contact support.");
     } else if (code === "auth/network-request-failed") {
       setError("Network error — check your connection and try again.");
     } else {
-      setError((e as Error).message || "Google sign-in failed. Please try again.");
+      setError(friendlyError(e));
     }
     setBusy(false);
-    setStep("");
     return;
   }
 
   await exchangeAndRedirect(
     { email: firebaseUser.email!, uid: firebaseUser.uid },
-    role, inviteCode, router, setError, setBusy, setStep,
+    role, inviteCode, router, setError, setBusy,
   );
 }
 
@@ -167,9 +132,10 @@ function LoginCard({
 }) {
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [inviteCode, setInviteCode] = useState("");
+  const [ngoName, setNgoName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState("");
+  const lookupTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isNgo = role === "ngo_admin";
 
@@ -240,7 +206,18 @@ function LoginCard({
             type="text"
             placeholder="e.g. ABC12345"
             value={inviteCode}
-            onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); setError(""); }}
+            onChange={(e) => {
+              const val = e.target.value.toUpperCase();
+              setInviteCode(val);
+              setError("");
+              setNgoName("");
+              if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+              if (val.length >= 6) {
+                lookupTimerRef.current = setTimeout(() => {
+                  api.lookupNGO(val).then((d) => setNgoName(d.ngo_name)).catch(() => setNgoName(""));
+                }, 300);
+              }
+            }}
             maxLength={16}
             style={{
               width: "100%", padding: "12px 15px", borderRadius: 11,
@@ -252,9 +229,15 @@ function LoginCard({
             onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(72,161,94,0.5)"; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
           />
-          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "6px 0 0" }}>
-            Get this code from your NGO administrator.
-          </p>
+          {ngoName ? (
+            <p style={{ color: "#6ee7b7", fontSize: 11, margin: "6px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+              <span>✓</span> Joining: <strong>{ngoName}</strong>
+            </p>
+          ) : (
+            <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "6px 0 0" }}>
+              Get this code from your NGO administrator.
+            </p>
+          )}
         </div>
       )}
 
@@ -291,7 +274,7 @@ function LoginCard({
             setError("Enter your invite code before continuing.");
             return;
           }
-          handleGoogleSignIn(role, inviteCode, router, setError, setBusy, setStep);
+          handleGoogleSignIn(role, inviteCode, router, setError, setBusy);
         }}
         disabled={busy}
         whileHover={{ scale: busy ? 1 : 1.015, boxShadow: busy ? undefined : "0 8px 24px rgba(0,0,0,0.35)" }}
@@ -308,14 +291,11 @@ function LoginCard({
         }}
       >
         {busy ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "flex", gap: 4 }}>
-              {[0, 1, 2].map((i) => (
-                <motion.div key={i} animate={{ y: [0, -5, 0] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                  style={{ width: 5, height: 5, borderRadius: 3, background: "#6b7280" }} />
-              ))}
-            </div>
-            {step && <span style={{ fontSize: 13, color: "#6b7280" }}>{step}</span>}
+          <div style={{ display: "flex", gap: 5 }}>
+            {[0, 1, 2].map((i) => (
+              <motion.div key={i} animate={{ y: [0, -6, 0] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.12 }}
+                style={{ width: 6, height: 6, borderRadius: 3, background: "#6b7280" }} />
+            ))}
           </div>
         ) : (
           <>
@@ -375,18 +355,6 @@ export default function LandingPage() {
     if (role === "ngo_admin") { setRedirecting(true); router.replace("/ngo/dashboard"); return; }
     if (role === "volunteer") { setRedirecting(true); router.replace("/vol/dashboard"); return; }
 
-    // Handle return from signInWithRedirect (popup fallback).
-    // getGoogleRedirectResult() resolves quickly with null if no redirect is pending.
-    getGoogleRedirectResult().then((res) => {
-      if (!res) return;
-      setRedirecting(true);
-      const noop = () => {};
-      exchangeAndRedirect(
-        { email: res.user.email!, uid: res.user.uid },
-        res.role, res.inviteCode, router, noop, noop,
-        (s) => { if (s) console.info("[redirect-signin]", s); },
-      );
-    }).catch(() => { /* redirect result error — stay on page */ });
   }, [router]);
 
   useEffect(() => {

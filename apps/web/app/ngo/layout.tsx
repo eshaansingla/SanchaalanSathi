@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, ClipboardList, Package, BarChart2,
-  LogOut, Building2, Calendar, MapPin, PanelLeftClose, PanelLeftOpen,
+  LogOut, Building2, Calendar, MapPin, PanelLeftClose, PanelLeftOpen, UserCircle, Bell,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { NGOAuthProvider, useNGOAuth } from "../../lib/ngo-auth";
@@ -18,7 +18,8 @@ const NAV_ITEMS = [
   { href: "/ngo/resources",  icon: Package,         label: "Resources",       sub: "Inventory & allocation" },
   { href: "/ngo/events",     icon: Calendar,        label: "Events",          sub: "Drives & campaigns"     },
   { href: "/ngo/analytics",  icon: BarChart2,       label: "Analytics",       sub: "Skills & performance"   },
-  { href: "/ngo/map",        icon: MapPin,          label: "Deployment Map",  sub: "Live operations"        },
+  { href: "/ngo/map",           icon: MapPin,  label: "Deployment Map",  sub: "Live operations"   },
+  { href: "/ngo/notifications", icon: Bell,    label: "Notifications",   sub: "Activity & alerts" },
 ];
 
 function NGOSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (v: boolean) => void }) {
@@ -122,6 +123,8 @@ function NGOSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCollap
 
 function NGOLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname   = usePathname();
+  const router     = useRouter();
+  const { user }   = useNGOAuth();
   const [collapsed, setCollapsed] = useState(false);
   const activeItem = NAV_ITEMS.find(
     (i) => pathname === i.href || pathname?.startsWith(i.href + "/")
@@ -133,7 +136,7 @@ function NGOLayoutInner({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Desktop header */}
-        <header className="hidden md:flex items-center h-13 px-4 shrink-0 gap-3" style={{ background: "#115E54" }}>
+        <header className="hidden md:flex items-center h-14 px-4 shrink-0 gap-3" style={{ background: "#115E54" }}>
           {/* Collapse toggle */}
           <motion.button
             onClick={() => setCollapsed((c) => !c)}
@@ -155,6 +158,16 @@ function NGOLayoutInner({ children }: { children: React.ReactNode }) {
               Live
             </div>
             <ThemeToggle size="sm" />
+            <button
+              onClick={() => router.push("/ngo/profile")}
+              title={user?.email ?? "My Account"}
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-white/10 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(72,161,94,0.25)" }}>
+                <UserCircle size={16} className="text-emerald-300" />
+              </div>
+              <span className="text-xs text-white/60 max-w-[140px] truncate hidden lg:block">{user?.email}</span>
+            </button>
           </div>
         </header>
 
@@ -164,6 +177,9 @@ function NGOLayoutInner({ children }: { children: React.ReactNode }) {
           <img src="/logo/logo-icon.png" alt="logo" className="h-6 w-6 object-contain" />
           <span className="text-sm font-bold text-white">Sanchaalan Saathi</span>
           <span className="text-[10px] text-white/45 ml-1">NGO Portal</span>
+          <button onClick={() => router.push("/ngo/profile")} className="ml-auto p-1.5 rounded-lg hover:bg-white/10">
+            <UserCircle size={18} className="text-white/60" />
+          </button>
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar" style={{ background: "#0B3D36" }}>

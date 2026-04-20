@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Plus, X, Loader2, AlertCircle, ChevronDown, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type Resource = {
@@ -42,7 +42,7 @@ export default function ResourcesPage() {
       api.ngoTasks(user.token, { status: "open" }),
     ])
       .then(([r, t]) => { setResources(r as Resource[]); setTasks(t as Task[]); })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -57,7 +57,7 @@ export default function ResourcesPage() {
       setForm({ type: "", quantity: 1 });
       setShowCreate(false);
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setSubmitting(false); }
   };
 
@@ -67,7 +67,7 @@ export default function ResourcesPage() {
     try {
       await api.allocateResource(user.token, resourceId, taskId);
       load();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(friendlyError(e)); }
     finally { setAllocating(null); }
   };
 

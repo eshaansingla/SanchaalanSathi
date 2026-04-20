@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
 from db.base import get_db
-from db.models import User, VolunteerProfile, Task, Assignment, Resource, Allocation, Notification, NGO, Event, EventAttendance
+from db.models import User, VolunteerProfile, Task, Assignment, Resource, Allocation, Notification, NGO, Event, EventAttendance, TaskEnrollmentRequest
 from middleware.rbac import CurrentUser, require_ngo_admin, assert_same_ngo
 from services.ai_matching import rank_volunteers
 
@@ -22,6 +22,8 @@ class TaskCreateReq(BaseModel):
     required_skills: List[str] = Field(default_factory=list)
     priority:        str = Field("medium", pattern="^(low|medium|high)$")
     deadline:        Optional[datetime] = None
+    lat:             Optional[float] = Field(None, ge=-90, le=90)
+    lng:             Optional[float] = Field(None, ge=-180, le=180)
 
 
 class TaskUpdateReq(BaseModel):
@@ -31,6 +33,8 @@ class TaskUpdateReq(BaseModel):
     priority:        Optional[str] = Field(None, pattern="^(low|medium|high)$")
     status:          Optional[str] = Field(None, pattern="^(open|in_progress|completed|cancelled)$")
     deadline:        Optional[datetime] = None
+    lat:             Optional[float] = Field(None, ge=-90, le=90)
+    lng:             Optional[float] = Field(None, ge=-180, le=180)
 
 
 class AssignReq(BaseModel):
@@ -41,6 +45,8 @@ class ResourceCreateReq(BaseModel):
     type:     str = Field(..., min_length=2, max_length=100)
     quantity: int = Field(..., ge=0)
     metadata: dict = Field(default_factory=dict)
+    lat:      Optional[float] = Field(None, ge=-90, le=90)
+    lng:      Optional[float] = Field(None, ge=-180, le=180)
 
 
 class ResourceUpdateReq(BaseModel):
@@ -48,6 +54,8 @@ class ResourceUpdateReq(BaseModel):
     quantity:            Optional[int]  = None
     availability_status: Optional[str]  = Field(None, pattern="^(available|in_use|depleted)$")
     metadata:            Optional[dict] = None
+    lat:                 Optional[float] = Field(None, ge=-90, le=90)
+    lng:                 Optional[float] = Field(None, ge=-180, le=180)
 
 
 class AllocateReq(BaseModel):
@@ -186,6 +194,7 @@ async def list_tasks(
             "id": t.id, "title": t.title, "description": t.description,
             "required_skills": t.required_skills, "priority": t.priority,
             "status": t.status, "deadline": t.deadline, "created_at": t.created_at,
+            "lat": t.lat, "lng": t.lng,
         }
         for t in tasks
     ]
@@ -204,6 +213,8 @@ async def create_task(
         required_skills=req.required_skills,
         priority=req.priority,
         deadline=req.deadline,
+        lat=req.lat,
+        lng=req.lng,
     )
     db.add(task)
     await db.flush()
@@ -229,6 +240,8 @@ async def update_task(
     if req.priority is not None:        task.priority = req.priority
     if req.status is not None:          task.status = req.status
     if req.deadline is not None:        task.deadline = req.deadline
+    if req.lat is not None:             task.lat = req.lat
+    if req.lng is not None:             task.lng = req.lng
     return {"id": task.id, "status": task.status, "priority": task.priority}
 
 
@@ -283,6 +296,130 @@ async def assign_task(
     db.add(notif)
     await db.flush()
     return {"assignment_id": assignment.id, "status": "assigned"}
+
+
+class PingReq(BaseModel):
+    message: Optional[str] = None
+
+
+@router.post("/tasks/{task_id}/ping")
+async def ping_task_volunteers(
+    task_id: str,
+    req: PingReq,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    task = (await db.execute(
+        select(Task).where(Task.id == task_id, Task.ngo_id == user.ngo_id)
+    )).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    assignments = (await db.execute(
+        select(Assignment).where(
+            Assignment.task_id == task_id,
+            Assignment.ngo_id == user.ngo_id,
+            Assignment.status.in_(["assigned", "accepted"]),
+        )
+    )).scalars().all()
+
+    msg = req.message or f"NGO update on task: {task.title}"
+    for a in assignments:
+        db.add(Notification(user_id=a.volunteer_id, message=msg, type="general"))
+    return {"count": len(assignments)}
+
+
+@router.get("/enrollment-requests")
+async def list_enrollment_requests(
+    status: Optional[str] = None,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = (
+        select(TaskEnrollmentRequest, Task, User)
+        .join(Task, Task.id == TaskEnrollmentRequest.task_id)
+        .join(User, User.id == TaskEnrollmentRequest.volunteer_id)
+        .where(TaskEnrollmentRequest.ngo_id == user.ngo_id)
+    )
+    if status:
+        q = q.where(TaskEnrollmentRequest.status == status)
+    rows = (await db.execute(q.order_by(TaskEnrollmentRequest.created_at.desc()))).fetchall()
+    return [
+        {
+            "id":              r.id,
+            "task_id":         r.task_id,
+            "task_title":      t.title,
+            "volunteer_id":    r.volunteer_id,
+            "volunteer_email": u.email,
+            "reason":          r.reason,
+            "why_useful":      r.why_useful,
+            "status":          r.status,
+            "created_at":      r.created_at,
+        }
+        for r, t, u in rows
+    ]
+
+
+@router.post("/enrollment-requests/{req_id}/approve")
+async def approve_enrollment(
+    req_id: str,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    er = (await db.execute(
+        select(TaskEnrollmentRequest).where(
+            TaskEnrollmentRequest.id == req_id,
+            TaskEnrollmentRequest.ngo_id == user.ngo_id,
+        )
+    )).scalar_one_or_none()
+    if not er:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if er.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request already {er.status}")
+
+    er.status = "approved"
+    assignment = Assignment(
+        task_id=er.task_id,
+        volunteer_id=er.volunteer_id,
+        ngo_id=er.ngo_id,
+        status="assigned",
+    )
+    db.add(assignment)
+    task = await db.get(Task, er.task_id)
+    db.add(Notification(
+        user_id=er.volunteer_id,
+        message=f"Your request to join '{task.title if task else er.task_id}' was approved!",
+        type="task_assigned",
+    ))
+    await db.flush()
+    return {"message": "Approved", "assignment_id": assignment.id}
+
+
+@router.post("/enrollment-requests/{req_id}/reject")
+async def reject_enrollment(
+    req_id: str,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    er = (await db.execute(
+        select(TaskEnrollmentRequest).where(
+            TaskEnrollmentRequest.id == req_id,
+            TaskEnrollmentRequest.ngo_id == user.ngo_id,
+        )
+    )).scalar_one_or_none()
+    if not er:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if er.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request already {er.status}")
+
+    er.status = "rejected"
+    task = await db.get(Task, er.task_id)
+    db.add(Notification(
+        user_id=er.volunteer_id,
+        message=f"Your request to join '{task.title if task else er.task_id}' was not approved.",
+        type="general",
+    ))
+    return {"message": "Rejected"}
 
 
 @router.post("/tasks/{task_id}/complete")
@@ -348,6 +485,7 @@ async def list_resources(
         {
             "id": r.id, "type": r.type, "quantity": r.quantity,
             "availability_status": r.availability_status, "metadata": r.metadata_,
+            "lat": r.lat, "lng": r.lng,
         }
         for r in resources
     ]
@@ -359,7 +497,7 @@ async def create_resource(
     user: CurrentUser = Depends(require_ngo_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    resource = Resource(ngo_id=user.ngo_id, type=req.type, quantity=req.quantity, metadata_=req.metadata)
+    resource = Resource(ngo_id=user.ngo_id, type=req.type, quantity=req.quantity, metadata_=req.metadata, lat=req.lat, lng=req.lng)
     db.add(resource)
     await db.flush()
     return {"id": resource.id, "type": resource.type}
@@ -382,6 +520,8 @@ async def update_resource(
     if req.quantity is not None:            res.quantity = req.quantity
     if req.availability_status is not None: res.availability_status = req.availability_status
     if req.metadata is not None:            res.metadata_ = req.metadata
+    if req.lat is not None:                 res.lat = req.lat
+    if req.lng is not None:                 res.lng = req.lng
     return {"id": res.id, "availability_status": res.availability_status}
 
 
@@ -484,6 +624,15 @@ async def analytics(
     gaps = [{"skill": s, "demand": cnt, "supply": all_skills.get(s, 0)} for s, cnt in required.items()]
     gaps.sort(key=lambda x: x["demand"] - x["supply"], reverse=True)
 
+    timed_rows = (await db.execute(
+        select(Assignment.assigned_at, Assignment.accepted_at)
+        .where(Assignment.ngo_id == nid, Assignment.accepted_at.isnot(None))
+    )).all()
+    valid_timed = [r for r in timed_rows if r.accepted_at and r.assigned_at]
+    avg_time = round(
+        sum((r.accepted_at - r.assigned_at).total_seconds() / 3600 for r in valid_timed) / len(valid_timed), 1
+    ) if valid_timed else 0
+
     return {
         "task_completion_rate":   task_completion_rate,
         "completed_tasks":        completed_tasks,
@@ -491,7 +640,7 @@ async def analytics(
         "volunteer_utilization":  volunteer_utilization,
         "total_assignments":      total_assignments,
         "completed_assignments":  completed_assignments,
-        "avg_assignment_time_hours": 0,  # requires timestamps on status changes — future work
+        "avg_assignment_time_hours": avg_time,
         "skill_coverage":         all_skills,
         "skill_gaps":             [g["skill"] for g in gaps if g["supply"] == 0][:10],
         "skill_coverage_gaps":    gaps[:10],
@@ -560,6 +709,53 @@ async def get_alerts(
         })
 
     return {"alerts": alerts}
+
+
+# ── NGO Notifications ────────────────────────────────────────────────────────
+
+@router.get("/notifications")
+async def get_ngo_notifications(
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(Notification)
+        .where(Notification.user_id == user.user_id)
+        .order_by(Notification.is_read.asc(), Notification.created_at.desc())
+        .limit(50)
+    )).scalars().all()
+    return [
+        {"id": n.id, "message": n.message, "type": n.type, "is_read": n.is_read, "created_at": n.created_at}
+        for n in rows
+    ]
+
+
+@router.post("/notifications/{notif_id}/read")
+async def mark_ngo_notif_read(
+    notif_id: str,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    n = (await db.execute(
+        select(Notification).where(Notification.id == notif_id, Notification.user_id == user.user_id)
+    )).scalar_one_or_none()
+    if not n:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    n.is_read = True
+    return {"id": n.id, "is_read": True}
+
+
+@router.post("/notifications/read-all")
+async def mark_all_ngo_notifs_read(
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(Notification).where(Notification.user_id == user.user_id, Notification.is_read.is_(False))
+    )).scalars().all()
+    for n in rows:
+        n.is_read = True
+    return {"marked": len(rows)}
 
 
 # ── Events ───────────────────────────────────────────────────────────────────
@@ -703,3 +899,71 @@ async def mark_attendance(
 
     await db.flush()
     return {"volunteer_id": vol_id, "status": body.status}
+
+
+# ── Volunteer live locations ──────────────────────────────────────────────────
+
+@router.get("/volunteer-locations")
+async def volunteer_locations(
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(VolunteerProfile, User.email)
+        .join(User, User.id == VolunteerProfile.user_id)
+        .where(
+            VolunteerProfile.ngo_id == user.ngo_id,
+            VolunteerProfile.share_location == True,
+            VolunteerProfile.lat.isnot(None),
+            VolunteerProfile.lng.isnot(None),
+        )
+    )).all()
+    return [
+        {
+            "id":             vp.id,
+            "user_id":        vp.user_id,
+            "email":          email,
+            "lat":            vp.lat,
+            "lng":            vp.lng,
+            "skills":         vp.skills,
+            "availability":   vp.availability,
+            "status":         vp.status,
+        }
+        for vp, email in rows
+    ]
+
+
+@router.get("/volunteers/{volunteer_id}/profile")
+async def get_volunteer_profile(
+    volunteer_id: str,
+    user: CurrentUser = Depends(require_ngo_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    row = (await db.execute(
+        select(VolunteerProfile, User.email)
+        .join(User, User.id == VolunteerProfile.user_id)
+        .where(
+            VolunteerProfile.user_id == volunteer_id,
+            VolunteerProfile.ngo_id == user.ngo_id,
+        )
+    )).first()
+    if not row:
+        raise HTTPException(404, "Volunteer not found")
+    vp, email = row
+    completed = (await db.execute(
+        select(func.count()).select_from(Assignment).where(
+            Assignment.volunteer_id == volunteer_id,
+            Assignment.ngo_id == user.ngo_id,
+            Assignment.status == "completed",
+        )
+    )).scalar() or 0
+    return {
+        "user_id":         vp.user_id,
+        "email":           email,
+        "skills":          vp.skills,
+        "availability":    vp.availability,
+        "status":          vp.status,
+        "lat":             vp.lat,
+        "lng":             vp.lng,
+        "completed_tasks": completed,
+    }

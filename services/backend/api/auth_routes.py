@@ -183,3 +183,12 @@ async def _google_auth_inner(req: GoogleAuthReq, db: AsyncSession):
 @router.post("/logout")
 async def logout():
     return {"message": "Logged out — delete token client-side"}
+
+
+@router.get("/ngo/lookup/{invite_code}")
+async def lookup_ngo(invite_code: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(NGO).where(NGO.invite_code == invite_code.upper()))
+    ngo = result.scalar_one_or_none()
+    if not ngo:
+        raise HTTPException(status_code=404, detail="Invalid invite code")
+    return {"ngo_name": ngo.name, "invite_code": ngo.invite_code}

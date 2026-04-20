@@ -1,3 +1,4 @@
+import datetime as dt
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 
 from db.base import get_db
-from db.models import User, VolunteerProfile, Task, Assignment, Notification
+from db.models import User, VolunteerProfile, Task, Assignment, Notification, TaskEnrollmentRequest
 from middleware.rbac import CurrentUser, require_volunteer
 
 router = APIRouter()
@@ -15,8 +16,24 @@ router = APIRouter()
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
 class ProfileUpdateReq(BaseModel):
-    skills:       Optional[List[str]] = None
-    availability: Optional[dict]      = None  # {"mon": true, ..., "sun": false}
+    skills:        Optional[List[str]] = None
+    availability:  Optional[dict]      = None
+    full_name:     Optional[str]       = Field(None, max_length=200)
+    phone:         Optional[str]       = Field(None, max_length=30)
+    city:          Optional[str]       = Field(None, max_length=100)
+    bio:           Optional[str]       = None
+    date_of_birth: Optional[str]       = None  # YYYY-MM-DD
+
+
+class EnrollReq(BaseModel):
+    reason:     str = Field(..., min_length=10, max_length=2000)
+    why_useful: str = Field(..., min_length=10, max_length=2000)
+
+
+class LocationUpdateReq(BaseModel):
+    lat:            float = Field(..., ge=-90,  le=90)
+    lng:            float = Field(..., ge=-180, le=180)
+    share_location: bool  = True
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
@@ -137,9 +154,15 @@ async def get_profile(
         "user_id":          user.user_id,
         "email":            u.email if u else user.email,
         "ngo_id":           user.ngo_id,
-        "skills":           p.skills       if p else [],
-        "availability":     p.availability if p else {},
-        "status":           p.status       if p else "active",
+        "skills":           p.skills          if p else [],
+        "availability":     p.availability    if p else {},
+        "status":           p.status          if p else "active",
+        "share_location":   p.share_location  if p else False,
+        "full_name":        p.full_name        if p else None,
+        "phone":            p.phone            if p else None,
+        "city":             p.city             if p else None,
+        "bio":              p.bio              if p else None,
+        "date_of_birth":    p.date_of_birth.isoformat() if p and p.date_of_birth else None,
         "completed_tasks":  completed_count,
         "total_assigned":   total_assigned,
         "acceptance_rate":  acceptance_rate,
@@ -159,8 +182,17 @@ async def update_profile(
     if not p:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    if req.skills is not None:       p.skills = req.skills
-    if req.availability is not None: p.availability = req.availability
+    if req.skills is not None:        p.skills = req.skills
+    if req.availability is not None:  p.availability = req.availability
+    if req.full_name is not None:     p.full_name = req.full_name
+    if req.phone is not None:         p.phone = req.phone
+    if req.city is not None:          p.city = req.city
+    if req.bio is not None:           p.bio = req.bio
+    if req.date_of_birth is not None:
+        try:
+            p.date_of_birth = dt.date.fromisoformat(req.date_of_birth)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="date_of_birth must be YYYY-MM-DD")
     return {"message": "Profile updated"}
 
 
@@ -234,6 +266,7 @@ async def accept_assignment(
         raise HTTPException(status_code=400, detail=f"Cannot accept — current status: {a.status}")
 
     a.status = "accepted"
+    a.accepted_at = dt.datetime.utcnow()
 
     # Notify NGO admin
     task = await db.get(Task, a.task_id)
@@ -309,6 +342,7 @@ async def complete_assignment(
         raise HTTPException(status_code=400, detail=f"Cannot complete — current status: {a.status}")
 
     a.status = "completed"
+    a.completed_at = dt.datetime.utcnow()
 
     task = await db.get(Task, a.task_id)
     task_completed = False
@@ -390,6 +424,153 @@ async def get_notifications(
     return [
         {"id": n.id, "message": n.message, "type": n.type, "is_read": n.is_read, "created_at": n.created_at}
         for n in rows
+    ]
+
+
+@router.put("/location")
+async def update_location(
+    req: LocationUpdateReq,
+    user: CurrentUser = Depends(require_volunteer),
+    db: AsyncSession = Depends(get_db),
+):
+    vp = (await db.execute(
+        select(VolunteerProfile).where(VolunteerProfile.user_id == user.user_id)
+    )).scalar_one_or_none()
+    if not vp:
+        raise HTTPException(status_code=404, detail="Volunteer profile not found")
+    vp.lat = req.lat
+    vp.lng = req.lng
+    vp.share_location = req.share_location
+    return {"share_location": vp.share_location, "lat": vp.lat, "lng": vp.lng}
+
+
+@router.delete("/location")
+async def clear_location(
+    user: CurrentUser = Depends(require_volunteer),
+    db: AsyncSession = Depends(get_db),
+):
+    vp = (await db.execute(
+        select(VolunteerProfile).where(VolunteerProfile.user_id == user.user_id)
+    )).scalar_one_or_none()
+    if not vp:
+        raise HTTPException(status_code=404, detail="Volunteer profile not found")
+    vp.lat = None
+    vp.lng = None
+    vp.share_location = False
+    return {"share_location": False}
+
+
+@router.get("/open-tasks")
+async def get_open_tasks(
+    user: CurrentUser = Depends(require_volunteer),
+    db: AsyncSession = Depends(get_db),
+):
+    profile = (await db.execute(
+        select(VolunteerProfile).where(VolunteerProfile.user_id == user.user_id)
+    )).scalar_one_or_none()
+    vol_skills = {s.lower() for s in (profile.skills or [])} if profile else set()
+
+    tasks = (await db.execute(
+        select(Task).where(Task.ngo_id == user.ngo_id, Task.status == "open")
+        .order_by(Task.created_at.desc())
+    )).scalars().all()
+
+    # Get this volunteer's existing requests
+    req_rows = (await db.execute(
+        select(TaskEnrollmentRequest).where(
+            TaskEnrollmentRequest.volunteer_id == user.user_id,
+            TaskEnrollmentRequest.ngo_id == user.ngo_id,
+        )
+    )).scalars().all()
+    req_map = {r.task_id: r.status for r in req_rows}
+
+    result = []
+    for t in tasks:
+        required = t.required_skills or []
+        matched = [s for s in required if s.lower() in vol_skills]
+        score = round(len(matched) / max(len(required), 1), 3)
+        result.append({
+            "id":              t.id,
+            "title":           t.title,
+            "description":     t.description,
+            "required_skills": required,
+            "priority":        t.priority,
+            "deadline":        t.deadline,
+            "created_at":      t.created_at,
+            "match_score":     score,
+            "matched_skills":  matched,
+            "request_status":  req_map.get(t.id),
+        })
+    return result
+
+
+@router.post("/tasks/{task_id}/enroll")
+async def enroll_task(
+    task_id: str,
+    req: EnrollReq,
+    user: CurrentUser = Depends(require_volunteer),
+    db: AsyncSession = Depends(get_db),
+):
+    task = (await db.execute(
+        select(Task).where(Task.id == task_id, Task.ngo_id == user.ngo_id, Task.status == "open")
+    )).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or not open")
+
+    existing = (await db.execute(
+        select(TaskEnrollmentRequest).where(
+            TaskEnrollmentRequest.task_id == task_id,
+            TaskEnrollmentRequest.volunteer_id == user.user_id,
+            TaskEnrollmentRequest.status == "pending",
+        )
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="You already have a pending request for this task")
+
+    enroll = TaskEnrollmentRequest(
+        task_id=task_id,
+        volunteer_id=user.user_id,
+        ngo_id=user.ngo_id,
+        reason=req.reason,
+        why_useful=req.why_useful,
+    )
+    db.add(enroll)
+
+    admin = (await db.execute(
+        select(User).where(User.ngo_id == user.ngo_id, User.role == "ngo_admin")
+    )).scalar_one_or_none()
+    if admin:
+        db.add(Notification(
+            user_id=admin.id,
+            message=f"Volunteer {user.email} requested to join task: {task.title}",
+            type="general",
+        ))
+    await db.flush()
+    return {"message": "Enrollment request submitted", "id": enroll.id}
+
+
+@router.get("/enrollment-requests")
+async def get_my_enrollment_requests(
+    user: CurrentUser = Depends(require_volunteer),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(TaskEnrollmentRequest, Task)
+        .join(Task, Task.id == TaskEnrollmentRequest.task_id)
+        .where(TaskEnrollmentRequest.volunteer_id == user.user_id)
+        .order_by(TaskEnrollmentRequest.created_at.desc())
+    )).fetchall()
+    return [
+        {
+            "id":         r.id,
+            "task_id":    r.task_id,
+            "task_title": t.title,
+            "reason":     r.reason,
+            "why_useful": r.why_useful,
+            "status":     r.status,
+            "created_at": r.created_at,
+        }
+        for r, t in rows
     ]
 
 

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users, ClipboardList, CheckCircle, Package, Clock, AlertCircle, Loader2, AlertTriangle, Zap, ClipboardCopy, Check } from "lucide-react";
 import { motion } from "motion/react";
-import { api } from "../../../lib/ngo-api";
+import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
 
 type DashData = {
@@ -62,7 +62,7 @@ export default function NGODashboardPage() {
         setData(d as DashData);
         setAlerts((a as any).alerts ?? []);
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(friendlyError(e)))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -162,7 +162,7 @@ export default function NGODashboardPage() {
               transition={{ delay: i * 0.07 }}
               whileHover={{ y: -4, boxShadow: "0 20px 40px rgba(42,130,86,0.2)", borderColor: "#95C78F" }}
               className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-2 cursor-default"
-              style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+              style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
             >
               <div className="relative w-10 h-10">
                 <div
@@ -202,7 +202,7 @@ export default function NGODashboardPage() {
           <motion.div
             whileHover={{ y: -2, borderColor: "#95C78F" }}
             className="rounded-2xl border border-gray-200 p-6 text-center text-sm text-gray-400"
-            style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+            style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
           >
             No tasks yet.{" "}
             <a href="/ngo/tasks" className="text-[#2A8256] font-semibold hover:underline">Create one →</a>
@@ -211,7 +211,7 @@ export default function NGODashboardPage() {
           <motion.div
             whileHover={{ y: -2, boxShadow: "0 12px 32px rgba(42,130,86,0.12)", borderColor: "#95C78F" }}
             className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
-            style={{ background: "linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%)" }}
+            style={{ background: "var(--card-bg)", borderColor: "var(--card-border)" }}
           >
             <table className="w-full text-sm">
               <thead>

@@ -23,6 +23,12 @@
   --bg-base:            #F5F6F1;
   --bg-surface:         #FFFFFF;
   --bg-muted:           #F9FAFB;
+
+  --card-bg:            linear-gradient(135deg, #F5F6F1 0%, #ffffff 100%);
+  --card-bg-flat:       #ffffff;
+  --card-border:        #E5E7EB;
+  --card-text-primary:  #1f2937;
+  --card-text-muted:    #6b7280;
 }
 
 /* ── Dark mode tokens ──────────────────────────────── */
@@ -37,6 +43,12 @@
   --bg-muted:       #1f2937;
 
   color-scheme: dark;
+
+  --card-bg:            rgba(255,255,255,0.06);
+  --card-bg-flat:       #1f2937;
+  --card-border:        rgba(255,255,255,0.1);
+  --card-text-primary:  #e2e8f0;
+  --card-text-muted:    #94a3b8;
 }
 
 body {
