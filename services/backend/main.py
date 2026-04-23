@@ -55,6 +55,9 @@ app = FastAPI(
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "")
 _extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 
+from middleware.guest import GuestSessionMiddleware
+app.add_middleware(GuestSessionMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -68,9 +71,6 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
-
-from middleware.guest import GuestSessionMiddleware
-app.add_middleware(GuestSessionMiddleware)
 
 
 from fastapi import Depends

@@ -1,7 +1,7 @@
 import type { AuthResponse, TaskResponse, VolunteerProfileResponse } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
+const DEFAULT_TIMEOUT = 30000;
 
 type GoogleAuthBody = { email: string; firebase_uid: string; role: string; invite_code?: string };
 
@@ -14,6 +14,10 @@ export function friendlyError(e: unknown): string {
   const msg = (e instanceof Error ? e.message : String(e)) || "";
   const lower = msg.toLowerCase();
 
+  if (process.env.NODE_ENV === "development") {
+    console.warn("[NGO-API ERROR]:", e);
+  }
+
   // Network-level failures: only match known browser-native network error patterns
   if (
     msg === "Failed to fetch" ||
@@ -24,8 +28,10 @@ export function friendlyError(e: unknown): string {
     lower.includes("the internet connection appears to be offline") ||
     lower.includes("load failed") ||
     (e instanceof TypeError && !msg)  // TypeError with empty message = fetch network error
-  )
-    return "Cannot reach server. Check your connection and try again.";
+  ) {
+    const target = BASE.includes("localhost") ? " (at " + BASE + ")" : "";
+    return `Cannot reach server${target}. Check your connection and try again.`;
+  }
   if (msg.includes("401") || lower.includes("unauthorized") || lower.includes("not authenticated"))
     return "Session expired. Please sign in again.";
   if (msg.includes("429") || lower.includes("too many requests") || lower.includes("throttled"))

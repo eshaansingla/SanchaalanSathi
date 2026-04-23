@@ -17,7 +17,7 @@ import { ChatbotWidget } from "@/components/ui/ChatbotWidget";
 
 // ── Shared sign-in logic ──────────────────────────────────────────────────────
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const BACKEND = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
 
 async function exchangeAndRedirect(
   firebaseUser: { email: string; uid: string },
