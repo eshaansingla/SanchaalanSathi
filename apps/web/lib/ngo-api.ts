@@ -20,11 +20,17 @@ export function friendlyError(e: unknown): string {
 
   // Network-level failures: only match known browser-native network error patterns
   if (
+    lower.includes("request timed out") ||
+    lower.includes("deadline exceeded")
+  ) {
+    return "The server is taking too long to respond. Please try again shortly.";
+  }
+
+  if (
     msg === "Failed to fetch" ||
     lower.includes("networkerror") ||
     lower.includes("network request failed") ||
     lower.includes("net::err_") ||
-    lower.includes("request timed out") ||
     lower.includes("the internet connection appears to be offline") ||
     lower.includes("load failed") ||
     (e instanceof TypeError && !msg)  // TypeError with empty message = fetch network error

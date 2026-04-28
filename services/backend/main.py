@@ -60,13 +60,8 @@ app.add_middleware(GuestSessionMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        *([_FRONTEND_URL] if _FRONTEND_URL else []),
-        *_extra_origins,
-    ],
-    allow_origin_regex=r"https?://.*",
+    allow_origins=["http://localhost:3000", "http://localhost:3001"] + ([_FRONTEND_URL] if _FRONTEND_URL else []),
+    allow_origin_regex=r"https?://.*", # Very permissive for development
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -84,13 +79,13 @@ async def log_requests(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception as exc:
+        import traceback
         duration = time.monotonic() - start
-        # Mask PII in exception logs before hitting trace logging
-        safe_exc = mask_pii(str(exc))
+        tb = traceback.format_exc()
         logger.error(
-            f"{request.method} {request.url.path} → 500 ({duration:.3f}s) UNHANDLED: {safe_exc}"
+            f"{request.method} {request.url.path} → 500 ({duration:.3f}s) UNHANDLED EXCEPTION:\n{tb}"
         )
-        return JSONResponse({"error": "Internal server error"}, status_code=500)
+        return JSONResponse({"error": f"Internal server error: {str(exc)}"}, status_code=500)
     duration = time.monotonic() - start
     level = logging.WARNING if response.status_code >= 400 else logging.INFO
     logger.log(

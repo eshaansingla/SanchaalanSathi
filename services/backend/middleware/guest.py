@@ -24,7 +24,7 @@ class GuestSessionMiddleware(BaseHTTPMiddleware):
                 value=guest_id,
                 max_age=365 * 24 * 60 * 60, # 1 Year
                 httponly=True,
-                secure=True,     # Must run on HTTPS
+                secure=request.url.scheme == "https",
                 samesite="lax",
             )
         
