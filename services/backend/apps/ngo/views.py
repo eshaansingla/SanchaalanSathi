@@ -12,7 +12,7 @@ from apps.ngo.models import (
     Notification, TaskEnrollmentRequest,
 )
 from apps.core.authentication import SynapseJWTAuthentication
-from apps.core.permissions import IsNGOAdminWithNGO, assert_same_ngo
+from apps.core.permissions import IsNGOAdminWithNGO
 
 logger = logging.getLogger(__name__)
 ENABLE_DYNAMIC_REASSIGNMENT = os.getenv("ENABLE_DYNAMIC_REASSIGNMENT", "true").lower() == "true"

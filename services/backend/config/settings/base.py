@@ -9,7 +9,6 @@ env = environ.Env(
     DEBUG=(bool, False),
     CORS_ALLOW_ALL=(bool, False),
     DB_PORT=(str, "5432"),
-    REDIS_URL=(str, "redis://localhost:6379"),
     CONN_MAX_AGE=(int, 60),
 )
 
@@ -104,10 +103,7 @@ SIMPLE_JWT = {
 
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [env("REDIS_URL")],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     }
 }
 
@@ -164,10 +160,7 @@ GEOAPIFY_API_KEY = env("GEOAPIFY_API_KEY", default="")
 NEO4J_URI = env("NEO4J_URI", default="bolt://localhost:7687")
 NEO4J_USER = env("NEO4J_USER", default="neo4j")
 NEO4J_PASSWORD = env("NEO4J_PASSWORD", default="")
-REDIS_HOST = env("REDIS_HOST", default="localhost")
-REDIS_PORT = env("REDIS_PORT", default="6379")
-REDIS_DB = env("REDIS_DB", default="0")
-REDIS_LOCATION_TTL_SECONDS = env.int("REDIS_LOCATION_TTL_SECONDS", default=120)
+LOCATION_CACHE_TTL_SECONDS = env.int("LOCATION_CACHE_TTL_SECONDS", default=120)
 ENABLE_DYNAMIC_REASSIGNMENT = env.bool("ENABLE_DYNAMIC_REASSIGNMENT", default=True)
 REASSIGNMENT_MOVE_THRESHOLD_KM = env.float("REASSIGNMENT_MOVE_THRESHOLD_KM", default=0.2)
 

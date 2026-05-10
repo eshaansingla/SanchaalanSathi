@@ -1,14 +1,12 @@
 """
-Cost matrix builder with Redis-backed distance cache.
+Cost matrix builder with in-memory distance cache.
 Cache key is derived from sorted volunteer/task coordinate fingerprints.
-TTL: 1 hour (distance data doesn't change often between runs).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
-import os
 
 from .clustering import chunk_indices, task_order, volunteer_order
 from .cost_function import OptimizationScore, OptimizationWeights, compute_pair_score
@@ -17,7 +15,8 @@ from .types import MatrixBuildResult, TaskSnapshot, VolunteerSnapshot
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = int(os.getenv("DISTANCE_CACHE_TTL_S", 3600))
+_distance_cache: dict[str, dict] = {}
+_CACHE_MAX_ENTRIES = 256
 
 
 def _matrix_cache_key(
@@ -31,36 +30,15 @@ def _matrix_cache_key(
     return "distmat:" + hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
-async def _get_redis():
-    """Lazy Redis import so module loads even if Redis is unavailable."""
-    try:
-        import redis.asyncio as aioredis
-        url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        return aioredis.from_url(url, decode_responses=True)
-    except Exception:
-        return None
+def _cache_get(key: str) -> dict | None:
+    return _distance_cache.get(key)
 
 
-async def _cache_get(key: str) -> dict | None:
-    r = await _get_redis()
-    if not r:
-        return None
-    try:
-        raw = await r.get(key)
-        return json.loads(raw) if raw else None
-    except Exception as exc:
-        logger.debug("Distance cache GET failed: %s", exc)
-        return None
-
-
-async def _cache_set(key: str, data: dict) -> None:
-    r = await _get_redis()
-    if not r:
-        return
-    try:
-        await r.setex(key, _CACHE_TTL_SECONDS, json.dumps(data))
-    except Exception as exc:
-        logger.debug("Distance cache SET failed: %s", exc)
+def _cache_set(key: str, data: dict) -> None:
+    if len(_distance_cache) >= _CACHE_MAX_ENTRIES:
+        oldest = next(iter(_distance_cache))
+        del _distance_cache[oldest]
+    _distance_cache[key] = data
 
 
 async def build_cost_matrix(
@@ -81,7 +59,7 @@ async def build_cost_matrix(
 
     # ── Distance matrix — Redis cache first ──────────────────────────────────
     cache_key = _matrix_cache_key(ordered_vol_snaps, ordered_task_snaps)
-    cached = await _cache_get(cache_key)
+    cached = _cache_get(cache_key)
 
     distance_lookup: dict[tuple[int, int], dict[str, float]]
 
@@ -123,7 +101,7 @@ async def build_cost_matrix(
 
         # Persist to Redis with string keys for JSON serialisability
         serialisable = {f"{k[0]},{k[1]}": v for k, v in distance_lookup.items()}
-        await _cache_set(cache_key, serialisable)
+        _cache_set(cache_key, serialisable)
 
     # ── Build cost / score matrices ───────────────────────────────────────────
     cost_matrix:     list[list[float]]             = []

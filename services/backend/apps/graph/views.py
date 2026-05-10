@@ -22,10 +22,6 @@ def _safe_int(val, default: int, lo: int = None, hi: int = None) -> int:
     return v
 
 
-def _run(coro):
-    return async_to_sync(coro)()
-
-
 class GraphStatsView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []

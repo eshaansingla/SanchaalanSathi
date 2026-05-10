@@ -40,7 +40,7 @@ class LiveLocationCache:
 
     def __init__(self) -> None:
         self._enabled = True
-        self._ttl_seconds = getattr(settings, "REDIS_LOCATION_TTL_SECONDS", 120)
+        self._ttl_seconds = getattr(settings, "LOCATION_CACHE_TTL_SECONDS", 120)
         self._buffer: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
         self._flush_task: asyncio.Task | None = None

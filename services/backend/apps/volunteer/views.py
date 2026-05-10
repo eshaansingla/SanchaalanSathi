@@ -1,6 +1,5 @@
 ﻿import logging
 import os
-from datetime import datetime, timezone
 from django.utils import timezone as dj_tz
 
 from rest_framework.views import APIView
@@ -306,27 +305,6 @@ class VolRecommendationsView(APIView):
             })
         results.sort(key=lambda x: x["match_score"], reverse=True)
         return Response(results[:5])
-
-
-class VolLocationClearView(APIView):
-    authentication_classes = [SynapseJWTAuthentication]
-    permission_classes = [IsVolunteerWithNGO]
-
-    def delete(self, request):
-        uid = request.user.user_id
-        nid = request.user.ngo_id
-        VolunteerProfile.objects.filter(user_id=uid, ngo_id=nid).update(
-            lat=None, lng=None, share_location=False
-        )
-        try:
-            from services.live_location_cache import live_location_cache
-            from asgiref.sync import async_to_sync
-            async_to_sync(live_location_cache.update)(
-                volunteer_id=uid, lat=None, lng=None, share_location=False
-            )
-        except Exception as e:
-            logger.warning("Location cache clear failed: %s", e)
-        return Response({"share_location": False})
 
 
 class VolSOSView(APIView):

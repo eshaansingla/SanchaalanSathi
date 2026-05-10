@@ -1,7 +1,6 @@
 ﻿import random
 import string
 import logging
-from datetime import datetime, timezone
 from django.utils import timezone as dj_tz
 
 from django.db import IntegrityError
