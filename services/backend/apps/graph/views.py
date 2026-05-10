@@ -40,11 +40,7 @@ class GraphStatsView(APIView):
                   count(v2) AS active_volunteers,
                   CASE WHEN total_needs>0 THEN round((toFloat(addressed)/total_needs)*100) ELSE 0 END AS coverage_pct
             """)
-            d = results[0] if results else {}
-            if d.get("total_needs",0) > 0:
-                d["total_volunteers"] = max(d.get("total_volunteers",0), 150)
-                d["active_volunteers"] = max(d.get("active_volunteers",0), 120)
-            return Response(d)
+            return Response(results[0] if results else {})
         except Exception as e:
             logger.error("get_stats failed: %s", e)
             return Response({"error": "Failed to fetch stats"}, status=500)
@@ -105,6 +101,7 @@ class GraphTasksView(APIView):
             )
             return Response({"tasks": results})
         except Exception as e:
+            logger.error("get_tasks failed: %s", e)
             return Response({"tasks": []})
 
 
@@ -120,6 +117,7 @@ class GraphHotspotsView(APIView):
             )
             return Response({"hotspots": results})
         except Exception as e:
+            logger.error("get_hotspots failed: %s", e)
             return Response({"hotspots": []})
 
 
@@ -140,6 +138,7 @@ class GraphCausalChainView(APIView):
             )
             return Response({"chain": results})
         except Exception as e:
+            logger.error("get_causal_chain failed: %s", e)
             return Response({"chain": []})
 
 
@@ -156,7 +155,7 @@ class GraphAskView(APIView):
         try:
             cypher = async_to_sync(text_to_cypher)(question)
             results = async_to_sync(neo4j_service.run_query)(cypher)
-            return Response({"results": results, "cypher": cypher})
+            return Response({"results": results})
         except Exception as e:
             logger.error("graph_ask failed: %s", e)
             return Response({"detail": str(e)}, status=500)

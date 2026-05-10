@@ -109,7 +109,7 @@ def _parse_service_account_json(raw: str) -> dict | None:
                 # Pass 2: \n (2 chars: backslash+n) → real newline character
                 pk = pk.replace("\\n", "\n")
                 result["private_key"] = pk
-                logger.info(f"private_key after normalization (first 60): {repr(pk[:60])}")
+                logger.debug("private_key normalization applied")
             return result
 
     # Diagnostic: log first 120 chars and length to help diagnose format issues

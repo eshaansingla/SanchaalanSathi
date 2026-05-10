@@ -490,12 +490,6 @@ class NGONotificationsView(APIView):
             "is_read": n.is_read, "created_at": n.created_at,
         } for n in notifs])
 
-    def patch(self, request, notif_id=None):
-        qs = Notification.objects.filter(user_id=request.user.user_id)
-        if notif_id:
-            qs = qs.filter(id=notif_id)
-        qs.update(is_read=True)
-        return Response({"message": "Marked as read"})
 
 
 # ── Analytics ─────────────────────────────────────────────────────────────────

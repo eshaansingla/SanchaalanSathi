@@ -4,7 +4,6 @@ from django.core.asgi import get_asgi_application
 _env = os.environ.get("DEPLOYMENT_ENV", "development").lower()
 _settings_map = {
     "production": "config.settings.production",
-    "staging": "config.settings.staging",
     "development": "config.settings.development",
 }
 os.environ.setdefault(

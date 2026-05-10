@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 # Accept both env var names; GEM_KEY takes precedence for backward compat
 _API_KEY = os.environ.get("GEM_KEY") or os.environ.get("GEMINI_API_KEY") or ""
 
-if not _API_KEY:
+if _API_KEY:
+    genai.configure(api_key=_API_KEY)
+else:
     logger.warning(
         "No Gemini API key found. Set GEM_KEY or GEMINI_API_KEY. "
         "Chatbot will fail until a key is provided."
     )
-
-genai.configure(api_key=_API_KEY)
 
 # Safety: allow humanitarian/emergency discussion; only block explicit harm
 _SAFETY_SETTINGS = [

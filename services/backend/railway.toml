@@ -3,7 +3,8 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+preDeployCommand = "python manage.py migrate --noinput"
+startCommand = "daphne -b 0.0.0.0 -p $PORT config.asgi:application"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"

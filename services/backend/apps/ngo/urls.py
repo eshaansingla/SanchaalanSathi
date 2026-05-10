@@ -26,7 +26,6 @@ urlpatterns = [
     path("enrollments/<str:enrollment_id>/<str:action>",     views.EnrollmentActionView.as_view()),
     path("notifications",                                    views.NGONotificationsView.as_view()),
     path("notifications/read-all",                           views.NotificationReadAllView.as_view()),
-    path("notifications/<str:notif_id>",                     views.NGONotificationsView.as_view()),
     path("notifications/<str:notif_id>/read",                views.NotificationReadView.as_view()),
     path("analytics",                                        views.NGOAnalyticsView.as_view()),
     path("alerts",                                           views.AlertsView.as_view()),

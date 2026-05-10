@@ -107,7 +107,11 @@ class ChatStreamView(APIView):
 
         def sync_generator():
             while True:
-                item = out.get()
+                try:
+                    item = out.get(timeout=120)
+                except queue.Empty:
+                    logger.error("Chat stream timed out waiting for async thread")
+                    break
                 if item is _DONE:
                     break
                 yield item
