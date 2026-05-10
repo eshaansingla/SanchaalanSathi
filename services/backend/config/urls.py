@@ -11,12 +11,14 @@ def health_check(request):
     except Exception:
         db_status = "error"
     status = 200 if db_status == "ok" else 503
-    return JsonResponse({
+    response = JsonResponse({
         "status": "healthy" if db_status == "ok" else "degraded",
         "database": db_status,
         "service": "sanchaalan-saathi-backend",
         "version": "2.0.0",
     }, status=status)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 urlpatterns = [

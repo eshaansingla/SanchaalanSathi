@@ -113,6 +113,7 @@ _EXTRA_ORIGINS = [o.strip() for o in env("ALLOWED_ORIGINS", default="").split(",
 CORS_ALLOWED_ORIGINS = list(filter(None, [
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://sanchaalan-saathi.vercel.app",
     _FRONTEND_URL,
 ] + _EXTRA_ORIGINS))
 
