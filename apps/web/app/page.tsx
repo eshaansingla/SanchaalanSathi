@@ -119,41 +119,51 @@ function ConnectivityBanner() {
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
   const failCountRef = React.useRef(0);
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = React.useRef(true);
 
   useEffect(() => {
-    // Retry delays (ms): wait 2s, 7s, 17s, 32s, then every 60s
+    isMountedRef.current = true;
+    // Retry delays (ms): 2s, 7s, 17s, 32s, then every 60s
     const RETRY_DELAYS = [2000, 5000, 10000, 15000, 60000];
 
     const check = async (attempt: number) => {
+      if (!isMountedRef.current) return;
       const controller = new AbortController();
       const abortTimer = setTimeout(() => controller.abort(), 12000);
       try {
-        const res = await fetch(`${BACKEND}/health`, { signal: controller.signal });
+        // /api/health is a same-origin Next.js proxy — eliminates all CORS/CSP issues
+        const res = await fetch("/api/health", { signal: controller.signal });
         clearTimeout(abortTimer);
+        if (!isMountedRef.current) return;
         if (res.ok) {
           failCountRef.current = 0;
           setStatus("online");
-          return; // success — stop retrying
+          return;
         }
         failCountRef.current += 1;
       } catch {
         clearTimeout(abortTimer);
+        if (!isMountedRef.current) return;
         failCountRef.current += 1;
       }
 
-      // Only show error banner after 3 consecutive failures
+      if (!isMountedRef.current) return;
+
+      // Show error only after 3 consecutive failures
       if (failCountRef.current >= 3) {
         setStatus("offline");
       }
 
-      // Schedule next check with capped exponential backoff
+      // Schedule next attempt with exponential backoff
       const nextDelay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
       timerRef.current = setTimeout(() => check(attempt + 1), nextDelay);
     };
 
-    // Start first check after a 2s page-render delay
     timerRef.current = setTimeout(() => check(1), 2000);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      isMountedRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   if (status === "online") return null;
