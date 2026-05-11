@@ -116,65 +116,60 @@ const GoogleIcon = () => (
 // ── Connectivity banner ───────────────────────────────────────────────────────
 
 function ConnectivityBanner() {
-  const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
+  // Start ONLINE — assume backend is reachable. Only show the banner if
+  // the backend is provably unreachable after sustained failures.
+  const [offline, setOffline] = useState(false);
   const failCountRef = React.useRef(0);
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = React.useRef(true);
 
   useEffect(() => {
     isMountedRef.current = true;
-    // Retry delays (ms): 2s, 7s, 17s, 32s, then every 60s
-    const RETRY_DELAYS = [2000, 5000, 10000, 15000, 60000];
 
-    const check = async (attempt: number) => {
+    const check = async () => {
       if (!isMountedRef.current) return;
       const controller = new AbortController();
-      const abortTimer = setTimeout(() => controller.abort(), 12000);
+      const abortTimer = setTimeout(() => controller.abort(), 20000);
       try {
-        // /api/health is a same-origin Next.js proxy — eliminates all CORS/CSP issues
         const res = await fetch("/api/health", { signal: controller.signal });
         clearTimeout(abortTimer);
         if (!isMountedRef.current) return;
         if (res.ok) {
           failCountRef.current = 0;
-          setStatus("online");
-          return;
+          setOffline(false);
+        } else {
+          failCountRef.current += 1;
+          // Only show error after 5 consecutive failures (~3+ minutes of downtime)
+          if (failCountRef.current >= 5) setOffline(true);
         }
-        failCountRef.current += 1;
       } catch {
         clearTimeout(abortTimer);
         if (!isMountedRef.current) return;
         failCountRef.current += 1;
+        if (failCountRef.current >= 5) setOffline(true);
       }
-
-      if (!isMountedRef.current) return;
-
-      // Show error only after 3 consecutive failures
-      if (failCountRef.current >= 3) {
-        setStatus("offline");
+      if (isMountedRef.current) {
+        timerRef.current = setTimeout(check, 30000);
       }
-
-      // Schedule next attempt with exponential backoff
-      const nextDelay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
-      timerRef.current = setTimeout(() => check(attempt + 1), nextDelay);
     };
 
-    timerRef.current = setTimeout(() => check(1), 2000);
+    // First check after 10s — give both Vercel and Railway time to warm up
+    timerRef.current = setTimeout(check, 10000);
     return () => {
       isMountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
-  if (status === "online") return null;
+  if (!offline) return null;
   return (
     <motion.div
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: "auto", opacity: 1 }}
-      style={{ background: status === "checking" ? "#1e293b" : "#7f1d1d", color: "#fff", padding: "8px 24px", fontSize: 12, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, zIndex: 200 }}
+      style={{ background: "#7f1d1d", color: "#fff", padding: "8px 24px", fontSize: 12, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, zIndex: 200 }}
     >
-      <div style={{ width: 8, height: 8, borderRadius: "50%", background: status === "checking" ? "#94a3b8" : "#f87171", animation: "blink 2s infinite" }} />
-      {status === "checking" ? "Connecting to servers…" : "Cannot reach servers. Check your connection or wait for maintenance to finish."}
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", animation: "blink 2s infinite" }} />
+      Cannot reach servers. Check your connection or wait for maintenance to finish.
     </motion.div>
   );
 }
