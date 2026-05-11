@@ -1,7 +1,10 @@
 import { NeedNode, HotspotResult, SimulationComparison } from "./types";
 import { fetchSafe, friendlyError } from "./ngo-api";
 
-const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
+// Use relative paths so all requests go through the Next.js rewrites proxy
+// (next.config.js rewrites() forwards /api/* → Railway backend).
+// Never construct absolute backend URLs here — that bypasses Vercel and breaks CORS.
+const API_BASE = "";
 const IS_PROD = process.env.NODE_ENV === "production";
 
 /**
