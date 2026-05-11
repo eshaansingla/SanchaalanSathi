@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { api, friendlyError } from "../../../lib/ngo-api";
 import { NGOAuthProvider, useNGOAuth } from "../../../lib/ngo-auth";
 import { enterGuestMode } from "../../../lib/guest-mode";
+import { setToken } from "../../../lib/token-manager";
 import {
   Users, Eye, EyeOff, Loader2, ChevronDown, X,
   Phone, Shield, CheckCircle2, ArrowRight, MapPin, Heart, Briefcase, Star,
@@ -212,8 +213,7 @@ function VolunteerRegisterForm() {
   }, [inviteCode]);
 
   const finalize = (token: string, emailUsed: string) => {
-    localStorage.setItem("ngo_token", token);
-    document.cookie = `ngo_token=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+    setToken(token);
     const p = JSON.parse(atob(token.split(".")[1]));
     setUser({ user_id: p.sub, role: "volunteer", ngo_id: p.ngo_id, email: emailUsed, token });
     setSuccess(true);

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { api, friendlyError } from "../../../lib/ngo-api";
 import { NGOAuthProvider, useNGOAuth } from "../../../lib/ngo-auth";
 import { enterGuestMode } from "../../../lib/guest-mode";
+import { setToken } from "../../../lib/token-manager";
 import {
   Building2, Eye, EyeOff, Loader2, ChevronDown, X,
   User, Phone, Globe, Shield, CheckCircle2, ArrowRight, MapPin, Star,
@@ -178,8 +179,7 @@ function NGORegisterForm() {
   const inputSty = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" };
 
   const finalize = (token: string, emailUsed: string) => {
-    localStorage.setItem("ngo_token", token);
-    document.cookie = `ngo_token=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+    setToken(token);
     const p = JSON.parse(atob(token.split(".")[1]));
     setUser({ user_id: p.sub, role: "ngo_admin", ngo_id: p.ngo_id, email: emailUsed, token });
     setSuccess(true);

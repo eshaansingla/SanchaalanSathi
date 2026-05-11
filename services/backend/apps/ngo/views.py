@@ -1,6 +1,6 @@
 ﻿import logging
 import os
-from datetime import datetime, timedelta
+from django.db.models import Count, Q
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -108,32 +108,39 @@ class VolunteersView(APIView):
         nid = request.user.ngo_id
         skill = request.query_params.get("skill")
         status = request.query_params.get("status")
-        profiles = VolunteerProfile.objects.filter(ngo_id=nid)
+        qs = VolunteerProfile.objects.filter(ngo_id=nid)
+        if status:
+            qs = qs.filter(status=status)
+        profiles = list(qs)
         if skill:
             profiles = [p for p in profiles if skill in (p.skills or [])]
-        else:
-            profiles = list(profiles)
-        if status:
-            profiles = [p for p in profiles if p.status == status]
+        user_ids = [p.user_id for p in profiles]
         user_map = {
             u["id"]: u
-            for u in User.objects.filter(
-                id__in=[p.user_id for p in profiles]
-            ).values("id", "email")
+            for u in User.objects.filter(id__in=user_ids).values("id", "email")
+        }
+        stats_map = {
+            s["volunteer_id"]: s
+            for s in Assignment.objects.filter(
+                ngo_id=nid, volunteer_id__in=user_ids
+            ).values("volunteer_id").annotate(
+                total=Count("id"),
+                completed=Count("id", filter=Q(status="completed")),
+            )
         }
         result = []
         for p in profiles:
             u = user_map.get(p.user_id)
             if not u:
                 continue
-            completed = Assignment.objects.filter(volunteer_id=p.user_id, ngo_id=nid, status="completed").count()
-            total = Assignment.objects.filter(volunteer_id=p.user_id, ngo_id=nid).count()
+            s = stats_map.get(p.user_id, {})
             result.append({
                 "id": p.id, "user_id": p.user_id, "email": u["email"],
                 "full_name": p.full_name, "skills": p.skills, "status": p.status,
                 "city": p.city, "availability": p.availability,
                 "profile_completeness_score": p.profile_completeness_score,
-                "completed_tasks": completed, "total_assigned": total,
+                "completed_tasks": s.get("completed", 0),
+                "total_assigned": s.get("total", 0),
             })
         return Response(result)
 
@@ -371,7 +378,11 @@ class ResourceDetailView(APIView):
             r = Resource.objects.get(id=resource_id, ngo_id=nid)
         except Resource.DoesNotExist:
             return Response({"detail": "Resource not found"}, status=404)
-        for field in ["type","quantity","availability_status","metadata","lat","lng"]:
+        if "quantity" in request.data:
+            q = request.data["quantity"]
+            if not isinstance(q, int) or q < 0:
+                return Response({"detail": "quantity must be a non-negative integer"}, status=400)
+        for field in ["type", "quantity", "availability_status", "metadata", "lat", "lng"]:
             if field in request.data:
                 setattr(r, field, request.data[field])
         r.save()
@@ -441,13 +452,14 @@ class EnrollmentsView(APIView):
     def get(self, request):
         nid = request.user.ngo_id
         status = request.query_params.get("status", "pending")
-        enrollments = TaskEnrollmentRequest.objects.filter(ngo_id=nid, status=status).order_by("-created_at")
+        enrollments = list(TaskEnrollmentRequest.objects.filter(ngo_id=nid, status=status).order_by("-created_at"))
+        task_map = {t.id: t for t in Task.objects.filter(id__in=[e.task_id for e in enrollments])}
+        user_map = {u.id: u for u in User.objects.filter(id__in=[e.volunteer_id for e in enrollments])}
         result = []
         for e in enrollments:
-            try:
-                t = Task.objects.get(id=e.task_id)
-                u = User.objects.get(id=e.volunteer_id)
-            except (Task.DoesNotExist, User.DoesNotExist):
+            t = task_map.get(e.task_id)
+            u = user_map.get(e.volunteer_id)
+            if not t or not u:
                 continue
             result.append({
                 "id": e.id, "task_id": e.task_id, "task_title": t.title,
@@ -470,22 +482,25 @@ class EnrollmentActionView(APIView):
             enr = TaskEnrollmentRequest.objects.get(id=enrollment_id, ngo_id=nid)
         except TaskEnrollmentRequest.DoesNotExist:
             return Response({"detail": "Enrollment not found"}, status=404)
-        enr.status = "approved" if action == "approve" else "rejected"
-        enr.save(update_fields=["status"])
         if action == "approve":
+            try:
+                task = Task.objects.get(id=enr.task_id)
+            except Task.DoesNotExist:
+                return Response({"detail": "Task not found"}, status=404)
+            enr.status = "approved"
+            enr.save(update_fields=["status"])
             Assignment.objects.get_or_create(
                 task_id=enr.task_id, volunteer_id=enr.volunteer_id,
                 ngo_id=nid, defaults={"status": "assigned"}
             )
-            try:
-                t = Task.objects.get(id=enr.task_id)
-                Notification.objects.create(
-                    user_id=enr.volunteer_id,
-                    message=f"Your enrollment for '{t.title}' was approved!",
-                    type="task_assigned",
-                )
-            except Task.DoesNotExist:
-                pass
+            Notification.objects.create(
+                user_id=enr.volunteer_id,
+                message=f"Your enrollment for '{task.title}' was approved!",
+                type="task_assigned",
+            )
+        else:
+            enr.status = "rejected"
+            enr.save(update_fields=["status"])
         return Response({"enrollment_id": enrollment_id, "status": enr.status})
 
 
@@ -514,25 +529,32 @@ class NGOAnalyticsView(APIView):
 
     def get(self, request):
         nid = request.user.ngo_id
-        tasks = Task.objects.filter(ngo_id=nid)
-        assignments = Assignment.objects.filter(ngo_id=nid)
+        t = Task.objects.filter(ngo_id=nid).aggregate(
+            open=Count("id", filter=Q(status="open")),
+            in_progress=Count("id", filter=Q(status="in_progress")),
+            completed=Count("id", filter=Q(status="completed")),
+            cancelled=Count("id", filter=Q(status="cancelled")),
+            high=Count("id", filter=Q(priority="high")),
+            medium=Count("id", filter=Q(priority="medium")),
+            low=Count("id", filter=Q(priority="low")),
+        )
+        a = Assignment.objects.filter(ngo_id=nid).aggregate(
+            assigned=Count("id", filter=Q(status="assigned")),
+            accepted=Count("id", filter=Q(status="accepted")),
+            completed=Count("id", filter=Q(status="completed")),
+            rejected=Count("id", filter=Q(status="rejected")),
+        )
         return Response({
             "tasks_by_status": {
-                "open": tasks.filter(status="open").count(),
-                "in_progress": tasks.filter(status="in_progress").count(),
-                "completed": tasks.filter(status="completed").count(),
-                "cancelled": tasks.filter(status="cancelled").count(),
+                "open": t["open"], "in_progress": t["in_progress"],
+                "completed": t["completed"], "cancelled": t["cancelled"],
             },
             "tasks_by_priority": {
-                "high": tasks.filter(priority="high").count(),
-                "medium": tasks.filter(priority="medium").count(),
-                "low": tasks.filter(priority="low").count(),
+                "high": t["high"], "medium": t["medium"], "low": t["low"],
             },
             "assignments_by_status": {
-                "assigned": assignments.filter(status="assigned").count(),
-                "accepted": assignments.filter(status="accepted").count(),
-                "completed": assignments.filter(status="completed").count(),
-                "rejected": assignments.filter(status="rejected").count(),
+                "assigned": a["assigned"], "accepted": a["accepted"],
+                "completed": a["completed"], "rejected": a["rejected"],
             },
             "total_volunteers": User.objects.filter(ngo_id=nid, role="volunteer").count(),
             "total_resources": Resource.objects.filter(ngo_id=nid).count(),

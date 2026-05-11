@@ -6,6 +6,7 @@ import { Building2, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { api, friendlyError } from "../../../lib/ngo-api";
 import { useNGOAuth } from "../../../lib/ngo-auth";
+import { setToken } from "../../../lib/token-manager";
 
 export default function NGOSetupPage() {
   const router = useRouter();
@@ -22,10 +23,13 @@ export default function NGOSetupPage() {
     setLoading(true);
     try {
       const res = await api.createNGO(user.token, { name, description: desc });
-      localStorage.setItem("ngo_token", res.token);
-      document.cookie = `ngo_token=${res.token}; path=/; max-age=${60 * 60 * 24}`;
-      const p = JSON.parse(atob(res.token.split(".")[1]));
-      setUser({ ...user, ngo_id: p.ngo_id, token: res.token, needs_ngo_setup: false });
+      setToken(res.token);
+      try {
+        const p = JSON.parse(atob(res.token.split(".")[1]));
+        setUser({ ...user, ngo_id: p.ngo_id, token: res.token, needs_ngo_setup: false });
+      } catch {
+        setUser({ ...user, token: res.token, needs_ngo_setup: false });
+      }
       window.location.href = "/ngo/dashboard";
     } catch (err: unknown) {
       setError(friendlyError(err));

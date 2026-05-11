@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { api, googleAuthWithRetry, friendlyError } from "./ngo-api";
 import { signInWithGoogle as firebaseSignInWithGoogle } from "./firebase-auth";
 import { authErrorMessage, isDismissedPopupError } from "./auth-errors";
+import { setToken, clearToken } from "./token-manager";
 
 export type NGOUser = {
   user_id: string;
@@ -82,8 +83,7 @@ export function NGOAuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(err.detail || `Login failed (${res.status})`);
       }
       const data = await res.json();
-      localStorage.setItem("ngo_token", data.token);
-      document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+      setToken(data.token);
       const parsed = parseToken(data.token) as NGOUser;
       setUser(parsed);
       return parsed;
@@ -121,16 +121,14 @@ export function NGOAuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(friendlyError(err));
     }
 
-    localStorage.setItem("ngo_token", data.token);
-    document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === 'https:' ? '; Secure' : ''}`;
+    setToken(data.token);
     const parsed = parseToken(data.token) as NGOUser;
     setUser(parsed);
     return parsed;
   };
 
   const logout = () => {
-    localStorage.removeItem("ngo_token");
-    document.cookie = "ngo_token=; path=/; max-age=0";
+    clearToken();
     setUser(null);
   };
 

@@ -21,6 +21,15 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 
+  async redirects() {
+    return [
+      { source: "/ngo-dashboard",       destination: "/ngo/dashboard", permanent: true },
+      { source: "/volunteer-dashboard", destination: "/vol/dashboard",  permanent: true },
+      { source: "/select-role",         destination: "/",               permanent: true },
+      { source: "/login",               destination: "/login-ngo",      permanent: true },
+    ];
+  },
+
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';

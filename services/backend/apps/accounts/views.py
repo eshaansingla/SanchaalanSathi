@@ -1,6 +1,7 @@
 ﻿import random
 import string
 import logging
+from datetime import timedelta
 from django.utils import timezone as dj_tz
 
 from django.db import IntegrityError
@@ -43,7 +44,6 @@ def _seed_ngo_demo_data(admin_user_id: str, ngo_id: str) -> None:
         ("Arjun Nair",   "arjun", ["search_rescue", "structural_assessment"], "Chennai",   5),
     ]
     import uuid
-    from datetime import timedelta
     volunteer_ids = []
     for name, sfx, skills, city, yrs in vol_specs:
         vu = User.objects.create(
@@ -124,7 +124,6 @@ def _seed_ngo_demo_data(admin_user_id: str, ngo_id: str) -> None:
 
 
 def _seed_volunteer_demo_data(vol_user_id: str, ngo_id: str) -> None:
-    from datetime import timedelta
     now = dj_tz.now()
 
     open_task_specs = [

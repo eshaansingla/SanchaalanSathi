@@ -352,6 +352,7 @@ class VolEnrollmentRequestsView(APIView):
 
     def get(self, request):
         uid = request.user.user_id
+        nid = request.user.ngo_id
         enrollments = TaskEnrollmentRequest.objects.filter(volunteer_id=uid, ngo_id=nid).order_by("-created_at")
         result = []
         for e in enrollments:

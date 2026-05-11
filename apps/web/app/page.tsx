@@ -15,6 +15,7 @@ import { authErrorCode, authErrorMessage, isDismissedPopupError } from "@/lib/au
 import { useTheme } from "@/components/ui/ThemeProvider";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ChatbotWidget } from "@/components/ui/ChatbotWidget";
+import { setToken } from "@/lib/token-manager";
 
 const BACKEND = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
 
@@ -66,8 +67,7 @@ async function handleGoogleSignIn(
         { email, firebase_uid: uid, role: role as "ngo_admin" | "volunteer" },
         { attempts: 3, timeoutMs: 30000 },
       );
-      localStorage.setItem("ngo_token", data.token);
-      document.cookie = `ngo_token=${data.token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+      setToken(data.token);
       if (data.needs_ngo_setup) window.location.href = "/ngo/setup";
       else if (data.role === "ngo_admin") window.location.href = "/ngo/dashboard";
       else window.location.href = "/vol/dashboard";
@@ -109,17 +109,38 @@ const GoogleIcon = () => (
 
 function ConnectivityBanner() {
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
+  const failCountRef = React.useRef(0);
+
   useEffect(() => {
+    // Use AbortController instead of AbortSignal.timeout() for broad browser support
     const check = async () => {
+      const controller = new AbortController();
+      // 12 seconds — covers Railway cold-start (10–15s) + Supabase DB wakeup
+      const timer = setTimeout(() => controller.abort(), 12000);
       try {
-        const res = await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(5000) });
-        setStatus(res.ok ? "online" : "offline");
-      } catch { setStatus("offline"); }
+        const res = await fetch(`${BACKEND}/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          failCountRef.current = 0;
+          setStatus("online");
+        } else {
+          failCountRef.current += 1;
+          if (failCountRef.current >= 2) setStatus("offline");
+        }
+      } catch {
+        clearTimeout(timer);
+        failCountRef.current += 1;
+        // Only show error after 2 consecutive failures — avoids false alarms on cold-start
+        if (failCountRef.current >= 2) setStatus("offline");
+      }
     };
-    check();
-    const t = setInterval(check, 60000);
-    return () => clearInterval(t);
+
+    // 2-second initial delay so the page renders before the network request fires
+    const initialTimer = setTimeout(check, 2000);
+    const interval = setInterval(check, 60000);
+    return () => { clearTimeout(initialTimer); clearInterval(interval); };
   }, []);
+
   if (status === "online") return null;
   return (
     <motion.div

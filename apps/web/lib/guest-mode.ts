@@ -1,3 +1,5 @@
+import { setToken, clearToken } from "./token-manager";
+
 const GUEST_KEY = "synapse_guest";
 const FAKE_NGO_ID = "guest-ngo-demo-0001";
 const FAKE_USER_ID = "guest-user-demo-0001";
@@ -24,10 +26,7 @@ function makeFakeJWT(role: "ngo_admin" | "volunteer"): string {
 export function enterGuestMode(role: "ngo_admin" | "volunteer"): void {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(GUEST_KEY, role);
-  const token = makeFakeJWT(role);
-  localStorage.setItem("ngo_token", token);
-  const secure = location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `ngo_token=${token}; path=/; max-age=${60 * 60 * 8}; SameSite=Strict${secure}`;
+  setToken(makeFakeJWT(role));
 }
 
 export function isGuestMode(): boolean {
@@ -43,6 +42,5 @@ export function getGuestRole(): "ngo_admin" | "volunteer" | null {
 export function exitGuestMode(): void {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(GUEST_KEY);
-  localStorage.removeItem("ngo_token");
-  document.cookie = "ngo_token=; path=/; max-age=0";
+  clearToken();
 }

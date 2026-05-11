@@ -4,21 +4,21 @@ from django.db import connection
 
 
 def health_check(request):
+    db_status = "ok"
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        db_status = "ok"
     except Exception:
         db_status = "error"
-    status = 200 if db_status == "ok" else 503
-    response = JsonResponse({
+    # Always return 200 — the server is reachable regardless of DB state.
+    # A 503 during cold-start causes the frontend banner to show even when
+    # the backend is healthy but the DB connection is still warming up.
+    return JsonResponse({
         "status": "healthy" if db_status == "ok" else "degraded",
         "database": db_status,
         "service": "sanchaalan-saathi-backend",
         "version": "2.0.0",
-    }, status=status)
-    response["Access-Control-Allow-Origin"] = "*"
-    return response
+    }, status=200)
 
 
 urlpatterns = [
